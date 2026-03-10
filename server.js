@@ -32,6 +32,7 @@ const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const USER_DATA_DIR = path.join(DATA_DIR, 'userdata');
 const KNOWN_HOSTS_FILE = path.join(DATA_DIR, 'known_hosts.json');
 const PRIVATE_NETWORKS_FILE = path.join(DATA_DIR, 'private-networks.json');
+const SSH_PASSWORD_KEY_FILE = path.join(DATA_DIR, '.ssh_password_key');
 
 const AUTH_SECRET_ENV = 'AUTH_SECRET';
 const AUTH_TOKEN_TTL = parseInt(process.env.AUTH_TOKEN_TTL || '43200', 10);
@@ -46,6 +47,7 @@ const ALLOW_PRIVATE_NETWORKS = process.env.ALLOW_PRIVATE_NETWORKS === 'true';
 
 const SSH_PASSWORD_ENV = 'SSH_PASSWORD_KEY';
 const SSH_PASSWORD_PREFIX = 'enc:v1:';
+let sshPasswordKeyCache = null;
 const SSH_AUTH_TYPE_PASSWORD = 'password';
 const SSH_AUTH_TYPE_KEY = 'key';
 const SSH_HOST_MAX_LENGTH = getPositiveIntEnv('SSH_HOST_MAX_LENGTH', 255);
@@ -79,21 +81,44 @@ function getAuthSecret() {
     return key;
 }
 
-function getSshPasswordKey() {
-    const rawKey = process.env[SSH_PASSWORD_ENV];
-    if (!rawKey) {
-        throw new Error(`${SSH_PASSWORD_ENV} is required for SSH password encryption`);
+function parseSshPasswordKeyRaw(rawKey, sourceLabel) {
+    const normalized = String(rawKey || '').trim();
+    if (!normalized) {
+        throw new Error(`${sourceLabel} is empty or missing`);
     }
     let key = null;
-    if (/^[0-9a-fA-F]{64}$/.test(rawKey)) {
-        key = Buffer.from(rawKey, 'hex');
+    if (/^[0-9a-fA-F]{64}$/.test(normalized)) {
+        key = Buffer.from(normalized, 'hex');
     } else {
-        key = Buffer.from(rawKey, 'base64');
+        key = Buffer.from(normalized, 'base64');
     }
     if (key.length !== 32) {
-        throw new Error(`${SSH_PASSWORD_ENV} must be 32 bytes (base64) or 64 hex chars`);
+        throw new Error(`${sourceLabel} must be 32 bytes (base64) or 64 hex chars`);
     }
     return key;
+}
+
+function ensurePersistedSshPasswordKey() {
+    if (fs.existsSync(SSH_PASSWORD_KEY_FILE)) {
+        const stored = fs.readFileSync(SSH_PASSWORD_KEY_FILE, 'utf8').trim();
+        if (!stored) {
+            throw new Error(`${SSH_PASSWORD_KEY_FILE} 文件存在但内容为空，请修复或删除后重启`);
+        }
+        return stored;
+    }
+    const generated = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(SSH_PASSWORD_KEY_FILE, generated + '\n', { mode: 0o600 });
+    console.warn(`[SSH] ${SSH_PASSWORD_ENV} 未设置，已生成持久化密钥: ${SSH_PASSWORD_KEY_FILE}`);
+    return generated;
+}
+
+function getSshPasswordKey() {
+    if (sshPasswordKeyCache) return sshPasswordKeyCache;
+    const envKey = String(process.env[SSH_PASSWORD_ENV] || '').trim();
+    const rawKey = envKey || ensurePersistedSshPasswordKey();
+    const sourceLabel = envKey ? SSH_PASSWORD_ENV : SSH_PASSWORD_KEY_FILE;
+    sshPasswordKeyCache = parseSshPasswordKeyRaw(rawKey, sourceLabel);
+    return sshPasswordKeyCache;
 }
 
 function isEncryptedSecret(value) {
@@ -737,17 +762,16 @@ const UserDataManager = {
         return decryptedHosts;
     },
 
-    addHost(userId, host) {
-        const data = this.load(userId);
-        // 检查是否已存在
-        const exists = data.hosts.some(h => h.host === host.host && h.user === host.user && `${h.port || 22}` === `${host.port || 22}`);
-        if (exists) {
-            return { success: false, error: '主机已存在' };
-        }
+    _findHostIndex(hosts, host) {
+        return hosts.findIndex(h => h.host === host.host && h.user === host.user && `${h.port || 22}` === `${host.port || 22}`);
+    },
+
+    _buildHostRecord(host, existing = null) {
         const encryptedPass = host.pass ? encryptSshPassword(host.pass) : '';
         const encryptedPrivateKey = host.privateKey ? encryptSshPassword(host.privateKey) : '';
         const encryptedPassphrase = host.passphrase ? encryptSshPassword(host.passphrase) : '';
-        data.hosts.push({
+        const now = new Date().toISOString();
+        const record = {
             host: host.host,
             port: host.port || 22,
             user: host.user,
@@ -755,8 +779,39 @@ const UserDataManager = {
             pass: encryptedPass,
             privateKey: encryptedPrivateKey,
             passphrase: encryptedPassphrase,
-            addedAt: new Date().toISOString()
-        });
+            addedAt: existing?.addedAt || now
+        };
+        if (existing) record.updatedAt = now;
+        return record;
+    },
+
+    addHost(userId, host) {
+        const data = this.load(userId);
+        const hosts = data.hosts || [];
+        const existingIndex = this._findHostIndex(hosts, host);
+
+        if (existingIndex >= 0) {
+            hosts[existingIndex] = this._buildHostRecord(host, hosts[existingIndex]);
+            this.save(userId, data);
+            return { success: true, updated: true };
+        }
+
+        hosts.push(this._buildHostRecord(host));
+        this.save(userId, data);
+        return { success: true, updated: false };
+    },
+
+    updateHost(userId, index, host) {
+        const data = this.load(userId);
+        const hosts = data.hosts || [];
+        if (!Number.isInteger(index) || index < 0 || index >= hosts.length) {
+            return { success: false, error: '索引无效' };
+        }
+        const dupIndex = this._findHostIndex(hosts, host);
+        if (dupIndex >= 0 && dupIndex !== index) {
+            return { success: false, error: '该主机地址已存在' };
+        }
+        hosts[index] = this._buildHostRecord(host, hosts[index]);
         this.save(userId, data);
         return { success: true };
     },
@@ -932,12 +987,50 @@ app.post('/api/userdata/:userId/hosts', requireSelfOrAdmin('userId'), (req, res)
             passphrase: credentials.passphrase
         });
         if (result.success) {
-            res.json({ message: '主机已保存' });
+            res.json({ message: result.updated ? '主机已更新' : '主机已保存' });
         } else {
             res.status(400).json({ error: result.error });
         }
     } catch (err) {
         console.error('[Hosts] 保存失败:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 编辑主机
+app.put('/api/userdata/:userId/hosts/:index', requireSelfOrAdmin('userId'), (req, res) => {
+    const { userId, index } = req.params;
+    let host = '';
+    let user = '';
+    let port = 22;
+    let credentials = null;
+
+    try {
+        host = normalizeRequiredString(req.body.host, '主机地址', SSH_HOST_MAX_LENGTH);
+        user = normalizeRequiredString(req.body.user, '用户名', SSH_USERNAME_MAX_LENGTH);
+        port = normalizePort(req.body.port, 22);
+        credentials = resolveSshCredentials(req.body, { requireCredential: false });
+    } catch (err) {
+        return res.status(400).json({ error: err.message });
+    }
+
+    try {
+        const result = UserDataManager.updateHost(userId, parseInt(index, 10), {
+            host,
+            port,
+            user,
+            authType: credentials.authType,
+            pass: credentials.password,
+            privateKey: credentials.privateKey,
+            passphrase: credentials.passphrase
+        });
+        if (result.success) {
+            res.json({ message: '主机已更新' });
+        } else {
+            res.status(400).json({ error: result.error });
+        }
+    } catch (err) {
+        console.error('[Hosts] 更新失败:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

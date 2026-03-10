@@ -275,8 +275,8 @@
             font-size: 11px;
             margin-bottom: 10px;
         }
-        .host-actions { display: flex; gap: 8px; }
-        .host-actions .btn { flex: 1; padding: 6px 10px; font-size: 12px; }
+        .host-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .host-actions .btn { flex: 1 1 calc(33% - 4px); padding: 6px 8px; font-size: 12px; min-width: 0; }
         .host-delete {
             position: absolute; top: 8px; right: 8px;
             background: none; border: none; color: var(--color-text-3);
@@ -1254,8 +1254,9 @@
                                 <input type="password" class="form-input" id="sshPassphrase" placeholder="私钥口令" maxlength="4096">
                             </div>
                         </div>
-                        <div class="input-group" style="justify-content:flex-end">
+                        <div class="input-group" style="justify-content:flex-end; gap: 8px;">
                             <label>&nbsp;</label>
+                            <button class="btn btn-secondary" id="cancelEditHostBtn" style="display:none"><i class="fas fa-times"></i> 取消编辑</button>
                             <button class="btn" id="saveHostBtn"><i class="fas fa-plus"></i> 保存主机</button>
                         </div>
                     </div>
@@ -1926,6 +1927,7 @@
             username: '',
             token: '',
             hosts: [],
+            editingHostIndex: null,
             sshConnected: false,
             sftpConnected: false,
             sftpSession: null,
@@ -2095,6 +2097,29 @@
             updateAuthFields(prefix, authType);
         }
 
+        function fillSshHostForm(host) {
+            document.getElementById('sshHost').value = host.host || '';
+            document.getElementById('sshPort').value = host.port || 22;
+            document.getElementById('sshUser').value = host.user || '';
+            fillCredentialForm('ssh', host);
+        }
+
+        function updateSaveHostButton() {
+            const btn = document.getElementById('saveHostBtn');
+            const cancelBtn = document.getElementById('cancelEditHostBtn');
+            if (!btn) return;
+            const editing = State.editingHostIndex !== null;
+            btn.innerHTML = editing
+                ? '<i class="fas fa-save"></i> 更新主机'
+                : '<i class="fas fa-plus"></i> 保存主机';
+            if (cancelBtn) cancelBtn.style.display = editing ? '' : 'none';
+        }
+
+        function setEditingHostIndex(index) {
+            State.editingHostIndex = Number.isInteger(index) ? index : null;
+            updateSaveHostButton();
+        }
+
         // 主题
         const Theme = {
             init() {
@@ -2205,6 +2230,7 @@
                 State.navHistory = [];
                 State.navIndex = -1;
                 State.selectedFiles = [];
+                setEditingHostIndex(null);
                 Storage.clearToken();
                 UI.resetConnections();
                 UI.hideDashboard();
@@ -3249,6 +3275,19 @@
             getUserId() {
                 return State.username;
             },
+            findMatchingIndex(host) {
+                return State.hosts.findIndex(h =>
+                    h.host === host.host && h.user === host.user && `${h.port || 22}` === `${host.port || 22}`
+                );
+            },
+            startEdit(index) {
+                const host = State.hosts[index];
+                if (!host) return;
+                UI.switchView('ssh');
+                fillSshHostForm(host);
+                setEditingHostIndex(index);
+                document.getElementById('sshHost').focus();
+            },
             async load() {
                 const userId = this.getUserId();
                 if (!userId) return;
@@ -3257,15 +3296,20 @@
                     const data = await res.json().catch(() => []);
                     if (!res.ok) {
                         State.hosts = [];
+                        setEditingHostIndex(null);
                         this.render();
                         Toast.error(data.error || '加载主机列表失败');
                         return;
                     }
                     State.hosts = Array.isArray(data) ? data : [];
+                    if (State.editingHostIndex !== null && State.editingHostIndex >= State.hosts.length) {
+                        setEditingHostIndex(null);
+                    }
                     this.render();
                 } catch (e) {
                     console.error('加载主机列表失败:', e);
                     State.hosts = [];
+                    setEditingHostIndex(null);
                     this.render();
                 }
             },
@@ -3278,9 +3322,10 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(h)
                     });
-                    const data = await res.json();
+                    const data = await res.json().catch(() => ({}));
                     if (res.ok) {
-                        Toast.success('主机已保存');
+                        Toast.success(data.message || '主机已保存');
+                        setEditingHostIndex(null);
                         await this.load();
                     } else {
                         Toast.error(data.error || '保存失败');
@@ -3289,12 +3334,51 @@
                     Toast.error('保存失败: ' + e.message);
                 }
             },
+            async update(index, h) {
+                const userId = this.getUserId();
+                if (!userId) return;
+                try {
+                    const res = await apiFetch(`${Config.API}/api/userdata/${userId}/hosts/${index}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(h)
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok) {
+                        Toast.success(data.message || '主机已更新');
+                        setEditingHostIndex(null);
+                        await this.load();
+                    } else {
+                        Toast.error(data.error || '更新失败');
+                    }
+                } catch (e) {
+                    Toast.error('更新失败: ' + e.message);
+                }
+            },
+            async save(h) {
+                if (State.editingHostIndex !== null) {
+                    await this.update(State.editingHostIndex, h);
+                    return;
+                }
+                const existingIndex = this.findMatchingIndex(h);
+                if (existingIndex >= 0) {
+                    await this.update(existingIndex, h);
+                    return;
+                }
+                await this.add(h);
+            },
             async remove(i) {
                 const userId = this.getUserId();
                 if (!userId) return;
                 try {
                     const res = await apiFetch(`${Config.API}/api/userdata/${userId}/hosts/${i}`, { method: 'DELETE' });
                     if (res.ok) {
+                        if (State.editingHostIndex === i) {
+                            setEditingHostIndex(null);
+                        } else if (State.editingHostIndex !== null && State.editingHostIndex > i) {
+                            State.editingHostIndex -= 1;
+                            updateSaveHostButton();
+                        }
                         Toast.info('主机已删除');
                         await this.load();
                     }
@@ -3322,6 +3406,7 @@
                             <div class="host-details">${userText}@${hostText}:${portText}</div>
                             <span class="host-auth-tag">${authLabel}</span>
                             <div class="host-actions">
+                                <button class="btn btn-sm btn-secondary host-edit-btn" data-index="${i}"><i class="fas fa-pen"></i> 编辑</button>
                                 <button class="btn btn-sm ssh-btn" data-index="${i}"><i class="fas fa-terminal"></i> SSH</button>
                                 <button class="btn btn-sm btn-secondary sftp-btn" data-index="${i}"><i class="fas fa-folder"></i> SFTP</button>
                             </div>
@@ -3330,19 +3415,20 @@
                 `;
                 }).join('');
                 el.querySelectorAll('.host-delete').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); this.remove(+btn.dataset.index); }));
+                el.querySelectorAll('.host-edit-btn').forEach(btn => btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    this.startEdit(+btn.dataset.index);
+                }));
                 el.querySelectorAll('.ssh-btn').forEach(btn => btn.addEventListener('click', e => {
                     e.stopPropagation();
-                    const h = State.hosts[+btn.dataset.index];
+                    const index = +btn.dataset.index;
+                    const h = State.hosts[index];
                     try {
                         const authPayload = getHostCredentialPayload(h);
                         Terminal_.connect(h.host, h.port, h.user, authPayload);
                     } catch (err) {
                         Toast.error(err.message);
-                        UI.switchView('ssh');
-                        document.getElementById('sshHost').value = h.host || '';
-                        document.getElementById('sshPort').value = h.port || 22;
-                        document.getElementById('sshUser').value = h.user || '';
-                        fillCredentialForm('ssh', h);
+                        this.startEdit(index);
                     }
                 }));
                 el.querySelectorAll('.sftp-btn').forEach(btn => btn.addEventListener('click', e => {
@@ -5096,7 +5182,7 @@
                 updateAuthFields('sftp', document.getElementById('sftpAuthType').value);
 
                 // SSH
-                document.getElementById('saveHostBtn').addEventListener('click', () => {
+                document.getElementById('saveHostBtn').addEventListener('click', async () => {
                     const host = document.getElementById('sshHost').value.trim();
                     const port = document.getElementById('sshPort').value || 22;
                     const user = document.getElementById('sshUser').value.trim();
@@ -5106,10 +5192,21 @@
                     }
                     try {
                         const authPayload = readCredentialForm('ssh', { requireCredential: false });
-                        Hosts.add({ host, port, user, ...authPayload });
+                        await Hosts.save({ host, port, user, ...authPayload });
                     } catch (err) {
                         Toast.error(err.message);
                     }
+                });
+                document.getElementById('cancelEditHostBtn').addEventListener('click', () => {
+                    setEditingHostIndex(null);
+                    document.getElementById('sshHost').value = '';
+                    document.getElementById('sshPort').value = 22;
+                    document.getElementById('sshUser').value = '';
+                    document.getElementById('sshPass').value = '';
+                    document.getElementById('sshPrivateKey').value = '';
+                    document.getElementById('sshPassphrase').value = '';
+                    document.getElementById('sshAuthType').value = 'password';
+                    updateAuthFields('ssh', 'password');
                 });
                 // SSH Stats Monitor
                 document.getElementById('sysStatsHint').addEventListener('click', () => Terminal_.toggleStats());

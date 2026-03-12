@@ -1203,7 +1203,7 @@
             </div>
             <nav class="sidebar-nav">
                 <div class="nav-item active" data-view="ssh"><i class="fas fa-terminal"></i><span>SSH 终端</span></div>
-                <div class="nav-item" data-view="shell"><i class="fas fa-laptop-code"></i><span>终端</span></div>
+                <div class="nav-item" data-view="shell"><i class="fas fa-laptop-code"></i><span>Web 终端</span></div>
                 <div class="nav-item" data-view="sftp"><i class="fas fa-folder-tree"></i><span>SFTP 管理</span></div>
                 <div class="nav-item" data-view="vnc"><i class="fas fa-desktop"></i><span>VNC 远程</span></div>
                 <div class="nav-item" data-view="security"><i class="fas fa-shield-halved"></i><span>内网白名单</span></div>
@@ -1462,7 +1462,7 @@
 
             <!-- Local Shell -->
             <div class="view" id="view-shell">
-                <div class="header"><h2><i class="fas fa-laptop-code"></i> 终端</h2></div>
+                <div class="header"><h2><i class="fas fa-laptop-code"></i> Web 终端</h2></div>
                 <div class="content">
                     <div id="shellNotAvailable" style="display:none;padding:20px;background:var(--color-bg-2);border-radius:8px;margin-bottom:20px">
                         <p style="color:var(--color-warning);margin-bottom:8px"><i class="fas fa-exclamation-triangle"></i> 终端服务不可用</p>
@@ -1492,7 +1492,7 @@
                             <div class="terminal-dot red"></div>
                             <div class="terminal-dot yellow"></div>
                             <div class="terminal-dot green"></div>
-                            <span class="terminal-title" id="shellTermTitle">终端 - 未启动</span>
+                            <span class="terminal-title" id="shellTermTitle">Web 终端 - 未启动</span>
                             <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
                                 <button class="btn btn-sm btn-secondary" id="shellClearBtn"><i class="fas fa-eraser"></i> 清屏</button>
                             </div>
@@ -5025,14 +5025,14 @@
                     text.textContent = '运行中';
                     startBtn.style.display = 'none';
                     stopBtn.style.display = 'inline-flex';
-                    title.textContent = `终端 - ${shell || this.shellInfo}`;
+                    title.textContent = `Web 终端 - ${shell || this.shellInfo}`;
                 } else {
                     status.classList.remove('connected');
                     status.classList.add('disconnected');
                     text.textContent = '未启动';
                     startBtn.style.display = 'inline-flex';
                     stopBtn.style.display = 'none';
-                    title.textContent = '终端 - 未启动';
+                    title.textContent = 'Web 终端 - 未启动';
                 }
             }
         };

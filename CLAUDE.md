@@ -20,22 +20,46 @@ npm run dev
 node server.js
 
 # Default server URL: http://localhost:3000
+
+# Container workflows
+docker build -t entrance-tools .
+docker compose up -d --build
+# Podman users can substitute docker with podman
 ```
+
+## Environment Variables
+
+- `AUTH_SECRET` (required) - Auth token signing key; must decode to at least 32 bytes.
+- `SSH_PASSWORD_KEY` (optional) - 32-byte AES key for stored SSH credentials and private-network allowlists; if omitted, the server writes a generated key to `.ssh_password_key` under `ENTRANCE_DATA_DIR`.
+- `PORT` - HTTP port, defaults to `3000`.
+- `ENTRANCE_DATA_DIR` - Runtime data directory for `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, and `.ssh_password_key`.
+- `AUTH_TOKEN_TTL` - Bearer token lifetime in seconds, defaults to `43200`.
+- `LOGIN_WINDOW_MS` / `LOGIN_MAX_ATTEMPTS` - Login rate-limit window and failure threshold.
+- `STRICT_HOST_KEY_CHECKING` - When `true`, reject unknown SSH host keys instead of learning them.
+- `ALLOWED_TARGETS` - Comma-separated allowlist for SSH/VNC target hosts; supports exact names and `*.example.com` patterns.
+- `ALLOW_PRIVATE_NETWORKS` - When `true`, skip the admin-managed private CIDR whitelist check.
+- `ENTRANCE_DESKTOP_NOLOGIN` - When set to `1`, bypass login and auto-authenticate as `admin`.
 
 ## Architecture Overview
 
 ### Project Structure
 ```
 .
+├── .dockerignore       # Container build exclusions
+├── compose.yml         # Docker Compose service definition
+├── Dockerfile          # Container image build
 ├── public/
 │   ├── index.html      # Single-page frontend (HTML + CSS + JavaScript)
 │   └── vnc-client.js   # VNC browser client
-├── server.js           # Express backend server (HTTP + WebSocket + SSH/SFTP/Docker)
-├── local-shell.js      # Local shell module (Linux only)
+├── server.js           # Express backend server (HTTP + WebSocket + auth + SSH/SFTP/Docker)
+├── local-shell.js      # Local shell module (Linux/macOS via script, Windows via direct shell spawn)
 ├── vnc.js              # VNC WebSocket proxy
 ├── package.json        # Dependency manifest
-├── users.json          # User account data (generated at runtime)
-└── userdata/           # User data directory (generated at runtime)
+├── users.json          # User account data (generated at runtime, Argon2 hashes)
+├── known_hosts.json    # SSH host key cache (generated at runtime)
+├── private-networks.json  # Encrypted private CIDR allowlist (generated at runtime)
+├── .ssh_password_key   # Generated AES key when SSH_PASSWORD_KEY is not supplied
+└── userdata/           # User data directory (generated at runtime; encrypted SSH secrets live here)
 ```
 
 ### Frontend Architecture
@@ -46,16 +70,22 @@ node server.js
 
 ### Backend Architecture
 - Express.js HTTP/REST API server
-- WebSocket server for SSH connections
+- WebSocket upgrade handling for SSH, VNC, and admin-only local shell sessions
 - ssh2 library for SSH/SFTP functionality
-- File storage for user data and host lists
+- Auth/token system in `server.js` (signed bearer tokens, login throttling, optional no-login mode)
+- Private target validation via allowlists, private-network CIDR management, and known-host verification
+- File storage for user data, known hosts, and encrypted secrets
+- Container deployment support via `Dockerfile` and `compose.yml`
 
 ### Core Modules
-1. **UserManager** - User account management (CRUD)
-2. **UserDataManager** - User data management (host lists, stats)
-3. **SFTP Sessions** - SFTP session management
-4. **Guest Sessions** - Guest session management
-5. **Docker Stats** - Docker container resource monitoring via `docker stats --no-stream`
+1. **UserManager** - User account management, Argon2 hashing, and legacy plaintext migration
+2. **UserDataManager** - Per-user host storage and encrypted SSH credential persistence
+3. **Auth / Token System** - Login verification, rate limiting, signed bearer tokens, and optional desktop no-login mode
+4. **PrivateNetworkManager** - Admin-managed private CIDR allowlist stored encrypted at rest
+5. **Known Hosts Cache** - SSH host key pinning and strict host key checking support
+6. **SFTP Sessions** - In-memory SFTP session management
+7. **Local Shell Service** - Cross-platform local shell WebSocket endpoint
+8. **Docker Stats** - Docker container resource monitoring via `docker stats --no-stream`
 
 ### SSH Monitoring Panels
 The SSH view includes three collapsible monitoring panels below the terminal:
@@ -71,6 +101,7 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
 - `express` - Web framework
 - `ws` - WebSocket server
 - `ssh2` - SSH/SFTP client
+- `argon2` - Password hashing and legacy password migration
 - `multer` - File upload middleware
 - `archiver` - ZIP packaging
 
@@ -103,8 +134,10 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
 
 ## Important Notes
 
-- Default account: admin / admin
-- Password storage: plaintext (use bcrypt in production)
-- SFTP sessions are stored in memory (Map)
-- Guest data is cleared on disconnect
-- User data is isolated per user in separate JSON files
+- Default account: `admin / admin` on first boot.
+- Password storage: Argon2id hashes in `users.json`; legacy plaintext entries are upgraded on successful login.
+- Stored SSH credentials and private-network allowlist entries are AES-256-GCM encrypted with `SSH_PASSWORD_KEY`.
+- If `SSH_PASSWORD_KEY` changes, existing encrypted secrets become unreadable until the old key is restored or the values are re-entered.
+- SFTP sessions are stored in memory (Map).
+- User data is isolated per user in separate JSON files under `ENTRANCE_DATA_DIR`.
+- Local shell access is admin-only and supported on Linux, macOS, and Windows.

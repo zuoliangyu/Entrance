@@ -38,9 +38,9 @@
 
 ### 本地 Shell 终端
 - 在浏览器中访问服务器本地终端
-- 基于 script + child_process 实现，无需编译原生模块
-- **仅支持 Linux 系统**
-- 仅允许 PATH 内的 Shell（bash/zsh/fish 等）
+- Linux/macOS 使用 script + child_process，Windows 直接启动 shell 进程，无需编译原生模块
+- 支持 Linux、macOS、Windows
+- 仅允许 PATH 内的 Shell（bash/zsh/fish/cmd/powershell 等）
 - 256 色彩支持
 - 终端大小自适应
 
@@ -117,13 +117,39 @@ npm start
 
 默认账号为 `admin/admin`（首次启动自动生成）。
 
-### Podman 启动示例（Host 网络 + 串口）
+### Docker 启动示例
 
 ```bash
 # 构建镜像
-podman build -t entrance-tools .
+docker build -t entrance-tools .
 
-# 运行（Host 网络 + 串口设备 + 持久化数据）
+# 运行（端口映射 + 持久化数据）
+export AUTH_SECRET=$(openssl rand -base64 32)
+export SSH_PASSWORD_KEY=$(openssl rand -base64 32)
+docker run -d --name entrance-tools \
+  -p 3000:3000 \
+  -e AUTH_SECRET \
+  -e SSH_PASSWORD_KEY \
+  -e ENTRANCE_DATA_DIR=/data \
+  -v entrance-tools-data:/data \
+  entrance-tools:latest
+```
+
+### Docker Compose 启动示例
+
+项目已包含 `compose.yml`，默认将宿主机 `./data` 挂载到容器内 `/data`：
+
+```bash
+export AUTH_SECRET=$(openssl rand -base64 32)
+export SSH_PASSWORD_KEY=$(openssl rand -base64 32)
+docker compose up -d --build
+```
+
+### Podman 用户说明
+
+Podman 用户将上述示例中的 `docker` 替换为 `podman` 即可。如果需要 Host 网络和串口设备，可参考：
+
+```bash
 export AUTH_SECRET=$(openssl rand -base64 32)
 export SSH_PASSWORD_KEY=$(openssl rand -base64 32)
 podman run -d --name entrance-tools \
@@ -139,24 +165,43 @@ podman run -d --name entrance-tools \
 
 > 将 `--device /dev/ttyS*` 替换为你机器上实际存在的串口设备（例如 `/dev/ttyUSB0`、`/dev/ttyACM0`）。Host 网络模式下无需 `-p` 映射端口。
 
+## 环境变量
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `PORT` | `3000` | HTTP 服务监听端口 |
+| `ENTRANCE_DATA_DIR` | 项目根目录 | 持久化数据目录，包含 `users.json`、`userdata/`、`known_hosts.json`、`private-networks.json`、`.ssh_password_key` |
+| `AUTH_SECRET` | 无，必填 | 登录 token 签名密钥，要求至少 32 字节（base64 或 64 字符十六进制） |
+| `SSH_PASSWORD_KEY` | 未设置时自动生成 `.ssh_password_key` | 用于加密 SSH/SFTP 凭据与私有网络白名单的 32 字节密钥 |
+| `AUTH_TOKEN_TTL` | `43200` | 登录 token 有效期（秒） |
+| `LOGIN_WINDOW_MS` | `900000` | 登录失败限流时间窗口（毫秒） |
+| `LOGIN_MAX_ATTEMPTS` | `5` | 时间窗口内允许的最大失败登录次数 |
+| `STRICT_HOST_KEY_CHECKING` | `false` | 设为 `true` 时拒绝未知 SSH 主机指纹 |
+| `ALLOWED_TARGETS` | 空 | 允许连接的目标主机白名单，逗号分隔，支持 `*.example.com` |
+| `ALLOW_PRIVATE_NETWORKS` | `false` | 设为 `true` 时允许直接访问私有地址；否则需通过管理员白名单放行 |
+| `ENTRANCE_DESKTOP_NOLOGIN` | `0` | 设为 `1` 时跳过登录，直接以 `admin` 身份访问，仅建议在受信任环境使用 |
+
 ## 项目结构
 
 ```
 .
-├── public/         # 前端静态资源
+├── compose.yml          # Docker Compose 配置
+├── Dockerfile           # Docker 镜像构建文件
+├── public/              # 前端静态资源
 │   ├── index.html
 │   └── vnc-client.js
-├── server.js       # 后端服务器
-├── local-shell.js  # 本地 Shell 模块
-├── vnc.js          # VNC 代理模块
-├── nginx/          # 反向代理示例配置
-├── package.json    # 依赖配置
-├── users.json      # 用户数据（自动生成）
-├── known_hosts.json  # SSH 主机指纹（自动生成）
+├── server.js            # 后端服务器
+├── local-shell.js       # 本地 Shell 模块（跨平台）
+├── vnc.js               # VNC 代理模块
+├── nginx/               # 反向代理示例配置
+├── package.json         # 依赖配置
+├── users.json           # 用户数据（自动生成，可位于 ENTRANCE_DATA_DIR）
+├── .ssh_password_key    # SSH 凭据加密密钥（自动生成）
+├── known_hosts.json     # SSH 主机指纹（自动生成）
 ├── private-networks.json  # 私有网络白名单（自动生成，已加密）
-└── userdata/       # 用户数据目录（自动生成）
-    ├── admin.json  # admin 的主机列表
-    └── user1.json  # user1 的主机列表
+└── userdata/            # 用户数据目录（自动生成）
+    ├── admin.json       # admin 的主机列表
+    └── user1.json       # user1 的主机列表
 ```
 
 ## 技术栈
@@ -172,11 +217,12 @@ podman run -d --name entrance-tools \
 - [Express](https://expressjs.com/) - Web 框架
 - [ws](https://github.com/websockets/ws) - WebSocket
 - [ssh2](https://github.com/mscdex/ssh2) - SSH 客户端
-- script + child_process - 本地终端（Linux 原生，无需编译）
+- script + child_process / spawn - 本地终端（Linux/macOS/Windows，无需编译）
+- [argon2](https://github.com/ranisalt/node-argon2) - 用户密码 Argon2id 哈希
 - [multer](https://github.com/expressjs/multer) - 文件上传
 - [archiver](https://github.com/archiverjs/node-archiver) - ZIP 打包
 
-> **注意**：本地 Shell 功能仅支持 Linux 系统，使用 `script` 命令实现 PTY 功能，无需额外编译依赖。
+> **注意**：本地 Shell 功能支持 Linux、macOS 与 Windows。Linux/macOS 使用 `script` 创建 PTY，Windows 直接启动 `COMSPEC` 或 PATH 内 Shell，无需额外编译依赖。
 
 ## API 接口
 
@@ -425,13 +471,15 @@ memory:[used:8192, free:4096, cached:2048]
 
 ## 安全说明
 
-- 当前版本默认不启用登录保护，请部署在受信任网络内，并在反向代理层增加认证与 HTTPS。
+- 登录默认启用，登录 token 使用 `AUTH_SECRET` 进行签名；仅在 `ENTRANCE_DESKTOP_NOLOGIN=1` 时跳过登录流程。
+- `users.json` 中的密码使用 `Argon2id` 哈希存储；旧版明文密码会在用户成功登录后自动迁移。
 - SSH/SFTP 凭据（密码、私钥、私钥口令）仅保存在用户浏览器本地或服务端用户数据中，服务端落盘会使用 `SSH_PASSWORD_KEY` 进行 AES-256-GCM 加密。
-- `SSH_PASSWORD_KEY` 变更后，历史已加密凭据将无法解密；需要恢复原密钥或在界面中重新录入对应主机凭据。
-- **本地 Shell 安全提示**（仅 Linux）：本地 Shell 功能允许直接访问服务器终端，请确保：
+- 私有网络白名单存储在 `private-networks.json` 中，服务端落盘同样使用 `SSH_PASSWORD_KEY` 进行 AES-256-GCM 加密。
+- `SSH_PASSWORD_KEY` 变更后，历史已加密凭据和白名单将无法解密；需要恢复原密钥或重新录入数据。
+- **本地 Shell 安全提示**（Linux/macOS/Windows，仅管理员可用）：本地 Shell 功能允许直接访问服务器终端，请确保：
   - 仅在受信任的网络环境中使用
-  - 限制访问权限给授权用户
-  - 生产环境中考虑禁用此功能或添加额外认证
+  - 限制访问权限给授权管理员
+  - 生产环境中考虑禁用此功能或在反向代理层增加额外认证
 
 ## 许可证
 

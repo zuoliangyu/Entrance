@@ -2404,12 +2404,12 @@
         // 主题
         const Theme = {
             COLOR_SCHEMES: {
-                default:  { label: '默认方案', tone: '中性石墨',  preview: ['#cbd5e1', '#6b7280', '#374151'] },
-                sakura:   { label: '樱花粉',   tone: '柔和花瓣',  preview: ['#ffd9e2', '#f2b7c8', '#9d4760'] },
-                ocean:    { label: '海洋蓝',   tone: '清澈潮汐',  preview: ['#d4ecff', '#87c5f3', '#2f6f9f'] },
-                forest:   { label: '森林绿',   tone: '苔藓林地',  preview: ['#d7f0d5', '#8abf8a', '#447348'] },
-                twilight: { label: '暮光紫',   tone: '柔雾暮色',  preview: ['#ece3ff', '#b6a1e7', '#6c59a0'] },
-                amber:    { label: '琥珀橙',   tone: '温暖日落',  preview: ['#ffe6bf', '#f2bd69', '#a76617'] }
+                default:  { label: '默认方案', tone: '中性石墨' },
+                sakura:   { label: '樱花粉',   tone: '柔和花瓣' },
+                ocean:    { label: '海洋蓝',   tone: '清澈潮汐' },
+                forest:   { label: '森林绿',   tone: '苔藓林地' },
+                twilight: { label: '暮光紫',   tone: '柔雾暮色' },
+                amber:    { label: '琥珀橙',   tone: '温暖日落' }
             },
             init() {
                 State.theme = Storage.getTheme();
@@ -2422,24 +2422,51 @@
                 document.documentElement.setAttribute('data-theme', State.theme);
                 const icon = document.querySelector('#themeToggle i');
                 icon.className = State.theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-                Terminal_.applyTheme();
-                LocalShell.applyTheme();
-                Serial.applyTheme();
+                [
+                    ['Terminal_', Terminal_],
+                    ['LocalShell', LocalShell],
+                    ['Serial', Serial]
+                ].forEach(([name, module]) => {
+                    try {
+                        module.applyTheme();
+                    } catch (error) {
+                        console.error(`[Theme] ${name}.applyTheme() failed:`, error);
+                    }
+                });
             },
             applyColorScheme(scheme, persist = false) {
                 const key = this.COLOR_SCHEMES[scheme] ? scheme : 'default';
                 State.colorScheme = key;
                 document.documentElement.setAttribute('data-color-scheme', key);
                 if (persist) Storage.setColorScheme(key);
+                this.syncSchemeSelection();
                 this.apply();
-                this.renderSchemeGrid();
+            },
+            getSchemePreviewColors(scheme) {
+                const probe = document.createElement('div');
+                probe.setAttribute('data-theme', State.theme);
+                if (scheme !== 'default') {
+                    probe.setAttribute('data-color-scheme', scheme);
+                }
+                probe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none;';
+                document.body.appendChild(probe);
+                const style = getComputedStyle(probe);
+                const preview = [
+                    style.getPropertyValue('--color-accent-light').trim(),
+                    style.getPropertyValue('--color-accent').trim(),
+                    style.getPropertyValue('--color-accent-hover').trim()
+                ].filter(Boolean);
+                probe.remove();
+                return preview.length ? preview : ['#cbd5e1', '#6b7280', '#374151'];
             },
             renderSchemeGrid() {
                 const grid = document.getElementById('colorSchemeGrid');
                 if (!grid) return;
                 grid.innerHTML = Object.entries(this.COLOR_SCHEMES).map(([key, s]) => {
                     const active = key === State.colorScheme;
-                    const swatches = s.preview.map(c => `<span class="scheme-swatch" style="background:${escapeHtml(c)}"></span>`).join('');
+                    const swatches = this.getSchemePreviewColors(key)
+                        .map(c => `<span class="scheme-swatch" style="background:${escapeHtml(c)}"></span>`)
+                        .join('');
                     return `<button type="button" class="scheme-card${active ? ' active' : ''}" data-scheme="${escapeHtml(key)}" aria-pressed="${active}">
                         <div class="scheme-preview">${swatches}</div>
                         <div class="scheme-meta">
@@ -2452,10 +2479,31 @@
                     card.addEventListener('click', () => this.applyColorScheme(card.dataset.scheme, true));
                 });
             },
+            syncSchemeSelection() {
+                const grid = document.getElementById('colorSchemeGrid');
+                if (!grid) return;
+                grid.querySelectorAll('.scheme-card').forEach(card => {
+                    const active = card.dataset.scheme === State.colorScheme;
+                    card.classList.toggle('active', active);
+                    card.setAttribute('aria-pressed', String(active));
+                    const meta = card.querySelector('.scheme-meta');
+                    const badge = meta ? meta.querySelector('.scheme-badge') : null;
+                    if (active && !badge && meta) {
+                        const nextBadge = document.createElement('span');
+                        nextBadge.className = 'scheme-badge';
+                        nextBadge.textContent = '当前';
+                        meta.appendChild(nextBadge);
+                    }
+                    if (!active && badge) {
+                        badge.remove();
+                    }
+                });
+            },
             toggle() {
                 State.theme = State.theme === 'dark' ? 'light' : 'dark';
                 Storage.setTheme(State.theme);
                 this.apply();
+                this.renderSchemeGrid();
             },
             getTerminalTheme() {
                 return {

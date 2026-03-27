@@ -135,10 +135,15 @@ npm start
 ### 最小运行示例
 
 ```bash
-export AUTH_SECRET=$(openssl rand -base64 32)
-export SSH_PASSWORD_KEY=$(openssl rand -base64 32)
+mkdir -p ./.data
+[ -f ./.data/auth_secret ] || openssl rand -base64 32 > ./.data/auth_secret
+
+export ENTRANCE_DATA_DIR="$(pwd)/.data"
+export AUTH_SECRET="$(tr -d '\n' < ./.data/auth_secret)"
 npm start
 ```
+
+上面的示例会把运行时数据固定到 `./.data`，并让 Entrance 在 `./.data/.ssh_password_key` 中自动生成并复用 SSH 凭据加密密钥。不要在每次重启前重新生成 `SSH_PASSWORD_KEY`，否则历史白名单、密码和私钥将无法解密。
 
 默认账号为 `admin/admin`（首次启动自动生成）。
 
@@ -148,41 +153,47 @@ npm start
 # 构建镜像
 docker build -t entrance-tools .
 
+# 仅首次创建一次运行环境
+docker volume create entrance-tools-data
+[ -f ./.docker-auth_secret ] || openssl rand -base64 32 > ./.docker-auth_secret
+
 # 运行（端口映射 + 持久化数据）
-export AUTH_SECRET=$(openssl rand -base64 32)
-export SSH_PASSWORD_KEY=$(openssl rand -base64 32)
 docker run -d --name entrance-tools \
   -p 3000:3000 \
-  -e AUTH_SECRET \
-  -e SSH_PASSWORD_KEY \
+  -e AUTH_SECRET="$(tr -d '\n' < ./.docker-auth_secret)" \
   -e ENTRANCE_DATA_DIR=/data \
   -v entrance-tools-data:/data \
   entrance-tools:latest
 ```
+
+这里故意不传 `SSH_PASSWORD_KEY`。容器会在持久化卷 `/data/.ssh_password_key` 中自动生成并长期复用它；只要卷不丢，重建容器也不会导致历史加密数据失效。
 
 ### Docker Compose 启动示例
 
 项目已包含 `compose.yml`，默认将宿主机 `./data` 挂载到容器内 `/data`：
 
 ```bash
-export AUTH_SECRET=$(openssl rand -base64 32)
-export SSH_PASSWORD_KEY=$(openssl rand -base64 32)
+mkdir -p ./data
+[ -f ./.compose-auth_secret ] || openssl rand -base64 32 > ./.compose-auth_secret
+
+export AUTH_SECRET="$(tr -d '\n' < ./.compose-auth_secret)"
 docker compose up -d --build
 ```
+
+同样建议不要在每次 `docker compose up` 前重新生成 `SSH_PASSWORD_KEY`。保留 `./data` 目录后，Entrance 会自动复用 `./data/.ssh_password_key`。
 
 ### Podman 用户说明
 
 Podman 用户将上述示例中的 `docker` 替换为 `podman` 即可。如果需要 Host 网络和串口设备，可参考：
 
 ```bash
-export AUTH_SECRET=$(openssl rand -base64 32)
-export SSH_PASSWORD_KEY=$(openssl rand -base64 32)
+[ -f ./.podman-auth_secret ] || openssl rand -base64 32 > ./.podman-auth_secret
+
 podman run -d --name entrance-tools \
   --network host \
   --device /dev/ttyS0 \
   --device /dev/ttyS1 \
-  -e AUTH_SECRET \
-  -e SSH_PASSWORD_KEY \
+  -e AUTH_SECRET="$(tr -d '\n' < ./.podman-auth_secret)" \
   -e ENTRANCE_DATA_DIR=/data \
   -v entrance-tools-data:/data \
   entrance-tools:latest
@@ -197,7 +208,7 @@ podman run -d --name entrance-tools \
 | `PORT` | `3000` | HTTP 服务监听端口 |
 | `ENTRANCE_DATA_DIR` | 项目根目录 | 持久化数据目录，包含 `users.json`、`userdata/`、`known_hosts.json`、`private-networks.json`、`.ssh_password_key` |
 | `AUTH_SECRET` | 无，必填 | 登录 token 签名密钥，要求至少 32 字节（base64 或 64 字符十六进制） |
-| `SSH_PASSWORD_KEY` | 未设置时自动生成 `.ssh_password_key` | 用于加密 SSH/SFTP 凭据与私有网络白名单的 32 字节密钥 |
+| `SSH_PASSWORD_KEY` | 未设置时自动生成 `.ssh_password_key` | 用于加密 SSH/SFTP 凭据与私有网络白名单的 32 字节密钥；如果手动设置，必须在重启后保持不变 |
 | `AUTH_TOKEN_TTL` | `43200` | 登录 token 有效期（秒） |
 | `LOGIN_WINDOW_MS` | `900000` | 登录失败限流时间窗口（毫秒） |
 | `LOGIN_MAX_ATTEMPTS` | `5` | 时间窗口内允许的最大失败登录次数 |

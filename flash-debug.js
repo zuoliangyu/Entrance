@@ -36,6 +36,12 @@ const TOOL_DEFS = {
 };
 
 const TOOL_NAMES = Object.keys(TOOL_DEFS);
+const GDB_EXECUTABLE_CANDIDATES = [
+    'arm-none-eabi-gdb',
+    'gdb-multiarch',
+    'gdb'
+];
+const GDB_MANUAL_NAME_PATTERN = /(^|[-_.])(arm-none-eabi-gdb|gdb-multiarch|gdb)(\.exe)?$/i;
 const MAX_TEXT_LENGTH = 2048;
 const MAX_PATH_LENGTH = 4096;
 const PROCESS_KILL_TIMEOUT_MS = 1500;
@@ -162,6 +168,16 @@ function resolveExecutableFromPath(commandName) {
     return '';
 }
 
+function resolveExecutableFromCandidates(candidates = []) {
+    for (const candidate of candidates) {
+        const resolved = resolveExecutableFromPath(candidate);
+        if (resolved) {
+            return resolved;
+        }
+    }
+    return '';
+}
+
 function validateManualExecutablePath(tool, executablePath) {
     const normalizedPath = normalizeRequiredString(executablePath, '工具路径', MAX_PATH_LENGTH);
     const resolvedPath = path.resolve(normalizedPath);
@@ -237,6 +253,83 @@ function resolveExecutableOrThrow(tool, manualPath = '') {
         throw new Error(inspected.error);
     }
     throw new Error(`${TOOL_DEFS[tool].label} 不在 PATH 中，请填写手动路径`);
+}
+
+function validateGdbExecutablePath(executablePath) {
+    const normalizedPath = normalizeRequiredString(executablePath, 'GDB 路径', MAX_PATH_LENGTH);
+    const resolvedPath = path.resolve(normalizedPath);
+
+    let stats = null;
+    try {
+        stats = fs.statSync(resolvedPath);
+    } catch {
+        throw new Error('GDB 手动路径不存在');
+    }
+
+    if (!stats.isFile()) {
+        throw new Error('GDB 手动路径不是可执行文件');
+    }
+
+    try {
+        fs.accessSync(resolvedPath, fs.constants.X_OK);
+    } catch {
+        throw new Error('GDB 手动路径不可执行');
+    }
+
+    const basename = path.basename(resolvedPath);
+    if (!GDB_MANUAL_NAME_PATTERN.test(basename)) {
+        throw new Error('GDB 手动路径与 gdb / arm-none-eabi-gdb / gdb-multiarch 不匹配');
+    }
+
+    try {
+        return fs.realpathSync(resolvedPath);
+    } catch {
+        return resolvedPath;
+    }
+}
+
+function inspectGdbExecutable(manualPath = '') {
+    const manual = normalizeString(manualPath, 'GDB 路径', MAX_PATH_LENGTH);
+    if (manual) {
+        try {
+            const executablePath = validateGdbExecutablePath(manual);
+            return {
+                executablePath,
+                foundInPath: false,
+                manualPathProvided: true,
+                manualPathRequired: false,
+                error: ''
+            };
+        } catch (err) {
+            return {
+                executablePath: '',
+                foundInPath: false,
+                manualPathProvided: true,
+                manualPathRequired: true,
+                error: err.message
+            };
+        }
+    }
+
+    const executablePath = resolveExecutableFromCandidates(GDB_EXECUTABLE_CANDIDATES);
+    return {
+        executablePath,
+        foundInPath: Boolean(executablePath),
+        manualPathProvided: false,
+        manualPathRequired: !executablePath,
+        error: ''
+    };
+}
+
+function resolveGdbExecutableOrThrow(manualPath = '') {
+    const inspected = inspectGdbExecutable(manualPath);
+    if (inspected.executablePath) {
+        return inspected.executablePath;
+    }
+    if (inspected.error) {
+        throw new Error(inspected.error);
+    }
+    throw new Error('未找到可用的 GDB，请安装 gdb / arm-none-eabi-gdb / gdb-multiarch，或填写手动路径');
 }
 
 function ensureDirectory(dirPath) {
@@ -581,6 +674,35 @@ function escapeShellArg(arg) {
 
 function buildCommandPreview(command, args) {
     return [command, ...args].map(escapeShellArg).join(' ');
+}
+
+function normalizeSingleLineString(value, fieldName, maxLength = MAX_TEXT_LENGTH, options = {}) {
+    const normalized = normalizeString(value, fieldName, maxLength, options);
+    if (/[\r\n]/.test(normalized)) {
+        throw new Error(`${fieldName}不能包含换行`);
+    }
+    return normalized;
+}
+
+function quoteGdbPath(value) {
+    const normalized = normalizeRequiredString(value, '文件路径', MAX_PATH_LENGTH);
+    return `"${normalized.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function normalizeGdbRegisterName(value) {
+    const normalized = normalizeRequiredString(value, '寄存器名', 64);
+    const registerName = normalized.startsWith('$') ? normalized : `$${normalized}`;
+    if (!/^\$[A-Za-z0-9_]+$/.test(registerName)) {
+        throw new Error('寄存器名格式无效');
+    }
+    return registerName;
+}
+
+function getCommandValues(values = {}) {
+    if (!values || typeof values !== 'object') {
+        return {};
+    }
+    return values;
 }
 
 function normalizeDisplayPath(value) {
@@ -1222,6 +1344,424 @@ function buildProbeRsCommand(action, options) {
     };
 }
 
+function buildGdbCliCommandList(payload = {}) {
+    const commandId = normalizeRequiredString(payload.commandId, 'GDB 命令', 64).toLowerCase();
+    const values = getCommandValues(payload.values);
+    const readArg = (name, fieldName, options = {}) => {
+        const value = normalizeSingleLineString(values[name], fieldName, options.maxLength || MAX_TEXT_LENGTH, {
+            trim: options.trim !== false
+        });
+        if (!value && options.required) {
+            throw new Error(`${fieldName}不能为空`);
+        }
+        return value;
+    };
+
+    const arg1 = () => readArg('arg1', '参数 1', { required: true });
+    const arg2 = () => readArg('arg2', '参数 2', { required: true });
+    const arg3 = () => readArg('arg3', '参数 3', { required: true });
+
+    switch (commandId) {
+        case 'file':
+            return [`file ${quoteGdbPath(readArg('arg1', 'ELF 路径', { required: true }))}`];
+        case 'symbol-file':
+            return [`symbol-file ${quoteGdbPath(readArg('arg1', '符号文件路径', { required: true }))}`];
+        case 'target-extended-remote': {
+            const hostOrTarget = readArg('arg1', '主机或 host:port', { required: true });
+            const port = readArg('arg2', '端口', { required: false, maxLength: 16 });
+            const target = port ? `${hostOrTarget}:${port}` : hostOrTarget;
+            return [`target extended-remote ${target}`];
+        }
+        case 'disconnect':
+            return ['disconnect'];
+        case 'load':
+            return ['load'];
+        case 'compare-sections':
+            return ['compare-sections'];
+        case 'quit':
+            return ['quit'];
+        case 'continue':
+            return ['continue'];
+        case 'interrupt':
+            return ['interrupt'];
+        case 'step':
+            return ['step'];
+        case 'next':
+            return ['next'];
+        case 'finish':
+            return ['finish'];
+        case 'until':
+            return [`until ${arg1()}`];
+        case 'jump':
+            return [`jump ${arg1()}`];
+        case 'break':
+            return [`break ${arg1()}`];
+        case 'tbreak':
+            return [`tbreak ${arg1()}`];
+        case 'hbreak':
+            return [`hbreak ${arg1()}`];
+        case 'info-breakpoints':
+            return ['info breakpoints'];
+        case 'delete': {
+            const breakpointId = readArg('arg1', '断点 ID', { required: false, maxLength: 64 });
+            return [breakpointId ? `delete ${breakpointId}` : 'delete'];
+        }
+        case 'disable':
+            return [`disable ${readArg('arg1', '断点 ID', { required: true, maxLength: 64 })}`];
+        case 'enable':
+            return [`enable ${readArg('arg1', '断点 ID', { required: true, maxLength: 64 })}`];
+        case 'condition':
+            return [`condition ${readArg('arg1', '断点 ID', { required: true, maxLength: 64 })} ${arg2()}`];
+        case 'ignore': {
+            const breakpointId = readArg('arg1', '断点 ID', { required: true, maxLength: 64 });
+            const count = normalizeOptionalInteger(values.arg2, '忽略次数', { min: 0, max: Number.MAX_SAFE_INTEGER });
+            if (count === null) {
+                throw new Error('忽略次数不能为空');
+            }
+            return [`ignore ${breakpointId} ${count}`];
+        }
+        case 'watch':
+            return [`watch ${arg1()}`];
+        case 'rwatch':
+            return [`rwatch ${arg1()}`];
+        case 'awatch':
+            return [`awatch ${arg1()}`];
+        case 'backtrace':
+            return ['backtrace'];
+        case 'frame': {
+            const frameIndex = normalizeOptionalInteger(values.arg1, '帧号', { min: 0, max: Number.MAX_SAFE_INTEGER });
+            if (frameIndex === null) {
+                throw new Error('帧号不能为空');
+            }
+            return [`frame ${frameIndex}`];
+        }
+        case 'up':
+            return ['up'];
+        case 'down':
+            return ['down'];
+        case 'info-frame':
+            return ['info frame'];
+        case 'info-args':
+            return ['info args'];
+        case 'info-locals':
+            return ['info locals'];
+        case 'print':
+            return [`print ${arg1()}`];
+        case 'print-hex':
+            return [`p/x ${arg1()}`];
+        case 'print-dec':
+            return [`p/d ${arg1()}`];
+        case 'print-bin':
+            return [`p/t ${arg1()}`];
+        case 'display':
+            return [`display ${arg1()}`];
+        case 'undisplay':
+            return [`undisplay ${readArg('arg1', '显示项 ID', { required: true, maxLength: 64 })}`];
+        case 'set-variable':
+            return [`set variable ${readArg('arg1', '变量名', { required: true })}=${arg2()}`];
+        case 'whatis':
+            return [`whatis ${arg1()}`];
+        case 'ptype':
+            return [`ptype ${arg1()}`];
+        case 'info-registers':
+            return ['info registers'];
+        case 'info-all-registers':
+            return ['info all-registers'];
+        case 'print-register':
+            return [`print ${normalizeGdbRegisterName(readArg('arg1', '寄存器名', { required: true, maxLength: 64 }))}`];
+        case 'set-register':
+            return [
+                `set ${normalizeGdbRegisterName(readArg('arg1', '寄存器名', { required: true, maxLength: 64 }))} = ${arg2()}`
+            ];
+        case 'examine-memory': {
+            const count = normalizeOptionalInteger(values.arg1, '读取数量', { min: 1, max: 65535, fallback: 32 });
+            const unit = readArg('arg2', '读取格式', { required: true, maxLength: 8 }).toLowerCase();
+            const address = readArg('arg3', '地址', { required: true, maxLength: 128 });
+            if (!['b', 'h', 'w', 'i'].includes(unit)) {
+                throw new Error('读取格式仅支持 b / h / w / i');
+            }
+            const format = unit === 'i' ? 'i' : `${unit}x`;
+            return [`x/${count}${format} ${address}`];
+        }
+        case 'set-memory':
+            return [
+                `set {${readArg('arg1', '内存类型', { required: true, maxLength: 64 })}}${readArg('arg2', '地址', {
+                    required: true,
+                    maxLength: 128
+                })} = ${arg3()}`
+            ];
+        case 'dump-binary-memory':
+            return [
+                `dump binary memory ${quoteGdbPath(readArg('arg1', '导出文件', { required: true }))} ${readArg('arg2', '起始地址', {
+                    required: true,
+                    maxLength: 128
+                })} ${readArg('arg3', '结束地址', { required: true, maxLength: 128 })}`
+            ];
+        case 'restore-binary':
+            return [
+                `restore ${quoteGdbPath(readArg('arg1', '导入文件', { required: true }))} binary ${readArg('arg2', '装载地址', {
+                    required: true,
+                    maxLength: 128
+                })}`
+            ];
+        case 'disassemble': {
+            const location = readArg('arg1', '位置', { required: false, maxLength: 256 });
+            return [location ? `disassemble ${location}` : 'disassemble'];
+        }
+        case 'disassemble-mixed':
+            return [`disassemble /m ${arg1()}`];
+        case 'disassemble-raw':
+            return [`disassemble /r ${arg1()}`];
+        case 'list': {
+            const location = readArg('arg1', '位置', { required: false, maxLength: 256 });
+            return [location ? `list ${location}` : 'list'];
+        }
+        case 'monitor-raw':
+            return [`monitor ${readArg('arg1', 'monitor 命令', { required: true, maxLength: MAX_PATH_LENGTH })}`];
+        case 'pc-instructions':
+            return ['x/8i $pc'];
+        case 'run-to-cursor': {
+            const location = readArg('arg1', '文件:行号', { required: true, maxLength: 256 });
+            return [`tbreak ${location}`, 'continue'];
+        }
+        default:
+            throw new Error('不支持的 GDB 命令');
+    }
+}
+
+function buildGdbSessionPlan(payload = {}) {
+    const executablePath = resolveGdbExecutableOrThrow(payload.gdbPath || '');
+    const host = normalizeSingleLineString(payload.host || '127.0.0.1', '远端主机', 255);
+    const port = normalizeOptionalInteger(payload.port, '远端端口', { min: 1, max: 65535, fallback: 3333 });
+    const elfPath = normalizeString(payload.elfPath, 'ELF 路径', MAX_PATH_LENGTH);
+    const symbolPath = normalizeString(payload.symbolPath, '符号文件路径', MAX_PATH_LENGTH) || elfPath;
+    const autoFile = normalizeBoolean(payload.autoFile, true);
+    const autoConnect = normalizeBoolean(payload.autoConnect, true);
+    const useSymbolFile = normalizeBoolean(payload.useSymbolFile, false);
+    const args = ['--quiet', '--nx'];
+    const initialCommands = [
+        'set confirm off',
+        'set pagination off',
+        'set height 0'
+    ];
+    const notes = [
+        autoConnect
+            ? `GDB CLI 已启动，并将自动连接目标 ${host}:${port}。`
+            : 'GDB CLI 已启动，可稍后手动执行 target extended-remote。'
+    ];
+
+    if ((autoFile || useSymbolFile) && symbolPath) {
+        initialCommands.push(`${useSymbolFile ? 'symbol-file' : 'file'} ${quoteGdbPath(symbolPath)}`);
+    }
+
+    if (autoConnect) {
+        initialCommands.push(`target extended-remote ${host}:${port}`);
+    }
+
+    return {
+        tool: 'gdb',
+        action: 'cli',
+        executablePath,
+        args,
+        notes,
+        preview: buildCommandPreview(executablePath, args),
+        env: process.env,
+        initialCommands,
+        elevation: {
+            requested: false,
+            method: 'none',
+            interactiveWindow: false
+        }
+    };
+}
+
+function appendProbeRsCommonOptions(args, options = {}, config = {}) {
+    const probeSelection = normalizeProbeRsProbeSelection(options.probeSelection);
+    const target = normalizeString(options.target, '目标芯片', 256);
+    const speed = normalizeString(options.speed, '速率', 64);
+    const protocol = normalizeString(options.protocol, '协议', 16).toLowerCase();
+    const connectUnderReset = normalizeBoolean(options.connectUnderReset, false);
+    const includeCore = Boolean(config.includeCore);
+    const core = includeCore
+        ? normalizeOptionalInteger(options.core, 'Core', { min: 0, max: 255, fallback: 0 })
+        : null;
+
+    if (probeSelection) {
+        args.push('--probe', probeSelection);
+    }
+    if (target) {
+        args.push('--chip', target);
+    }
+    if (speed) {
+        args.push('--speed', speed);
+    }
+    if (protocol) {
+        if (protocol !== 'swd' && protocol !== 'jtag') {
+            throw new Error('probe-rs 协议仅支持 swd 或 jtag');
+        }
+        args.push('--protocol', protocol);
+    }
+    if (connectUnderReset) {
+        args.push('--connect-under-reset');
+    }
+    args.push('--non-interactive');
+
+    if (includeCore && core !== null) {
+        args.push('--core', String(core));
+    }
+}
+
+function buildProbeRsNativePlan(payload = {}) {
+    const tool = normalizeToolName(payload.tool);
+    if (tool !== 'probe-rs') {
+        throw new Error('probe-rs 原生命令仅在选择 probe-rs 调试器时可用');
+    }
+
+    const commandId = normalizeRequiredString(payload.commandId, 'probe-rs 命令', 64).toLowerCase();
+    const values = getCommandValues(payload.values);
+    const executablePath = resolveExecutableOrThrow(tool, payload.executablePath || '');
+    const args = [];
+    const notes = [];
+    const readArg = (name, fieldName, options = {}) => {
+        const value = normalizeSingleLineString(values[name], fieldName, options.maxLength || MAX_TEXT_LENGTH, {
+            trim: options.trim !== false
+        });
+        if (!value && options.required) {
+            throw new Error(`${fieldName}不能为空`);
+        }
+        return value;
+    };
+
+    switch (commandId) {
+        case 'probe-list':
+            args.push('list');
+            notes.push('已执行 probe-rs list，用于探测当前已连接的 probe。');
+            break;
+        case 'probe-info':
+            args.push('info');
+            appendProbeRsCommonOptions(args, payload, { includeCore: false });
+            notes.push('已执行 probe-rs info，用于查询当前 session 状态与目标识别信息。');
+            break;
+        case 'probe-reset':
+            args.push('reset');
+            appendProbeRsCommonOptions(args, payload, { includeCore: true });
+            notes.push('已执行 probe-rs reset。');
+            break;
+        case 'probe-erase':
+            args.push('erase');
+            appendProbeRsCommonOptions(args, payload, { includeCore: false });
+            notes.push('已执行 probe-rs erase（整片擦除）。');
+            break;
+        case 'probe-download': {
+            const filePath = readArg('arg1', '下载文件路径', { required: true, maxLength: MAX_PATH_LENGTH });
+            const binaryFormat = readArg('arg2', 'Binary 格式', { required: false, maxLength: 32 }).toLowerCase();
+            const baseAddress = readArg('arg3', '基地址', { required: false, maxLength: 128 });
+            const skip = readArg('arg4', '跳过字节数', { required: false, maxLength: 64 });
+
+            args.push('download');
+            appendProbeRsCommonOptions(args, payload, { includeCore: false });
+            if (binaryFormat) {
+                args.push('--binary-format', binaryFormat);
+            }
+            if (baseAddress) {
+                args.push('--base-address', baseAddress);
+            }
+            if (skip) {
+                args.push('--skip', skip);
+            }
+            if (normalizeBoolean(payload.verifyAfterLoad, false)) {
+                args.push('--verify');
+            }
+            if (normalizeBoolean(payload.chipErase, false)) {
+                args.push('--chip-erase');
+            }
+            args.push(filePath);
+            notes.push('已执行 probe-rs download。');
+            break;
+        }
+        case 'probe-verify': {
+            const filePath = readArg('arg1', '校验文件路径', { required: true, maxLength: MAX_PATH_LENGTH });
+            const binaryFormat = readArg('arg2', 'Binary 格式', { required: false, maxLength: 32 }).toLowerCase();
+            const baseAddress = readArg('arg3', '基地址', { required: false, maxLength: 128 });
+            const skip = readArg('arg4', '跳过字节数', { required: false, maxLength: 64 });
+
+            args.push('verify');
+            appendProbeRsCommonOptions(args, payload, { includeCore: false });
+            if (binaryFormat) {
+                args.push('--binary-format', binaryFormat);
+            }
+            if (baseAddress) {
+                args.push('--base-address', baseAddress);
+            }
+            if (skip) {
+                args.push('--skip', skip);
+            }
+            args.push(filePath);
+            notes.push('已执行 probe-rs verify。');
+            break;
+        }
+        case 'probe-read': {
+            const width = readArg('arg1', '读取宽度', { required: true, maxLength: 8 }).toLowerCase();
+            const address = readArg('arg2', '读取地址', { required: true, maxLength: 128 });
+            const words = readArg('arg3', '读取数量', { required: true, maxLength: 64 });
+            if (!['b8', 'b16', 'b32', 'b64'].includes(width)) {
+                throw new Error('读取宽度仅支持 b8 / b16 / b32 / b64');
+            }
+            args.push('read');
+            appendProbeRsCommonOptions(args, payload, { includeCore: true });
+            args.push(width, address, words);
+            notes.push('已执行 probe-rs read。');
+            break;
+        }
+        case 'probe-write': {
+            const width = readArg('arg1', '写入宽度', { required: true, maxLength: 8 }).toLowerCase();
+            const address = readArg('arg2', '写入地址', { required: true, maxLength: 128 });
+            const valuesText = readArg('arg3', '写入值', { required: true, maxLength: MAX_PATH_LENGTH, trim: false });
+            const writeValues = splitCliArgs(valuesText);
+            if (!['b8', 'b16', 'b32', 'b64'].includes(width)) {
+                throw new Error('写入宽度仅支持 b8 / b16 / b32 / b64');
+            }
+            if (writeValues.length === 0) {
+                throw new Error('至少需要一个写入值');
+            }
+            args.push('write');
+            appendProbeRsCommonOptions(args, payload, { includeCore: true });
+            args.push(width, address, ...writeValues);
+            notes.push('已执行 probe-rs write。');
+            break;
+        }
+        case 'probe-trace':
+            args.push('trace');
+            appendProbeRsCommonOptions(args, payload, { includeCore: true });
+            args.push(readArg('arg1', 'Trace 地址', { required: true, maxLength: 128 }));
+            notes.push('已执行 probe-rs trace。');
+            break;
+        case 'probe-attach':
+            args.push('attach');
+            appendProbeRsCommonOptions(args, payload, { includeCore: false });
+            args.push(readArg('arg1', 'RTT ELF 路径', { required: true, maxLength: MAX_PATH_LENGTH }));
+            notes.push('已执行 probe-rs attach（RTT/日志 attach）。');
+            break;
+        default:
+            throw new Error('不支持的 probe-rs 原生命令');
+    }
+
+    return {
+        tool,
+        action: 'cli',
+        executablePath,
+        args,
+        notes,
+        preview: buildCommandPreview(executablePath, args),
+        env: process.env,
+        elevation: {
+            requested: false,
+            method: 'none',
+            interactiveWindow: false
+        }
+    };
+}
+
 function buildExecutionPlan(payload = {}) {
     const action = normalizeRequiredString(payload.action, '操作类型', 32).toLowerCase();
     if (action !== 'flash' && action !== 'debug') {
@@ -1269,6 +1809,43 @@ function sendJson(ws, payload) {
     ws.send(JSON.stringify(payload));
 }
 
+function createSessionId(prefix = 'flashdebug') {
+    return `${prefix}_${typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : crypto.randomBytes(16).toString('hex')}`;
+}
+
+function sendInteractiveCommands(session, commands = []) {
+    if (!session || !session.process || !session.process.stdin) {
+        throw new Error('CLI 会话未启动');
+    }
+
+    const list = Array.isArray(commands) ? commands : [commands];
+    const normalized = list
+        .map(command => normalizeSingleLineString(command, 'CLI 命令', MAX_PATH_LENGTH, { trim: false }))
+        .filter(Boolean);
+
+    if (normalized.length === 0) {
+        return;
+    }
+
+    const chunk = normalized.map(command => `${command}\n`).join('');
+    sendJson(session.ws, {
+        type: 'output',
+        sessionId: session.id,
+        action: session.action,
+        sessionKind: session.kind,
+        stream: 'stdin',
+        data: normalized.map(command => `[stdin] ${command}\n`).join('')
+    });
+
+    try {
+        session.process.stdin.write(chunk);
+    } catch (err) {
+        throw new Error(err.message || 'CLI 命令发送失败');
+    }
+}
+
 function stopSession(session, reason = '用户停止') {
     if (!session || !session.process) return;
 
@@ -1276,6 +1853,7 @@ function stopSession(session, reason = '用户停止') {
         type: 'output',
         sessionId: session.id,
         action: session.action,
+        sessionKind: session.kind,
         stream: 'system',
         data: `[system] ${reason}\n`
     });
@@ -1292,6 +1870,147 @@ function stopSession(session, reason = '用户停止') {
     }, PROCESS_KILL_TIMEOUT_MS);
 }
 
+function buildInteractiveSpawnSpec(plan = {}, interactive = false) {
+    if (!interactive) {
+        return {
+            command: plan.executablePath,
+            args: plan.args || [],
+            note: ''
+        };
+    }
+
+    if (process.platform === 'linux') {
+        const scriptExecutable = resolveExecutableFromPath('script');
+        if (scriptExecutable) {
+            return {
+                command: scriptExecutable,
+                args: ['-q', '-e', '-f', '-E', 'never', '-c', buildCommandPreview(plan.executablePath, plan.args || []), '/dev/null'],
+                note: 'CLI 会话已通过 script PTY 包装，以确保交互式 GDB 输出实时返回到消息框。'
+            };
+        }
+    }
+
+    return {
+        command: plan.executablePath,
+        args: plan.args || [],
+        note: ''
+    };
+}
+
+function launchProcessSession(options = {}) {
+    const ws = options.ws;
+    const sessionsByKind = options.sessionsByKind;
+    const kind = normalizeRequiredString(options.kind, '会话类型', 32).toLowerCase();
+    const plan = options.plan || {};
+    const interactive = Boolean(options.interactive);
+    const spawnSpec = buildInteractiveSpawnSpec(plan, interactive);
+
+    const child = spawn(spawnSpec.command, spawnSpec.args, {
+        cwd: process.cwd(),
+        env: plan.env || process.env,
+        stdio: interactive ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
+        windowsHide: !(plan.elevation && plan.elevation.interactiveWindow)
+    });
+
+    const session = {
+        id: createSessionId(kind),
+        ws,
+        kind,
+        process: child,
+        action: plan.action || kind,
+        tool: plan.tool || '',
+        interactive
+    };
+
+    activeSessions.set(session.id, session);
+    sessionsByKind.set(kind, session);
+
+    sendJson(ws, {
+        type: 'started',
+        sessionId: session.id,
+        sessionKind: kind,
+        action: session.action,
+        tool: plan.tool || '',
+        pid: child.pid,
+        command: plan.preview
+    });
+
+    for (const note of plan.notes || []) {
+        sendJson(ws, {
+            type: 'output',
+            sessionId: session.id,
+            sessionKind: kind,
+            action: session.action,
+            stream: 'system',
+            data: `[system] ${note}\n`
+        });
+    }
+    if (spawnSpec.note) {
+        sendJson(ws, {
+            type: 'output',
+            sessionId: session.id,
+            sessionKind: kind,
+            action: session.action,
+            stream: 'system',
+            data: `[system] ${spawnSpec.note}\n`
+        });
+    }
+
+    child.stdout.on('data', (chunk) => {
+        sendJson(ws, {
+            type: 'output',
+            sessionId: session.id,
+            sessionKind: kind,
+            action: session.action,
+            stream: 'stdout',
+            data: chunk.toString('utf8')
+        });
+    });
+
+    child.stderr.on('data', (chunk) => {
+        sendJson(ws, {
+            type: 'output',
+            sessionId: session.id,
+            sessionKind: kind,
+            action: session.action,
+            stream: 'stderr',
+            data: chunk.toString('utf8')
+        });
+    });
+
+    child.on('error', (err) => {
+        sendJson(ws, {
+            type: 'error',
+            sessionId: session.id,
+            sessionKind: kind,
+            action: session.action,
+            message: err.message
+        });
+    });
+
+    child.on('close', (code, signal) => {
+        sendJson(ws, {
+            type: 'exit',
+            sessionId: session.id,
+            sessionKind: kind,
+            action: session.action,
+            exitCode: code ?? 0,
+            signal: signal || null
+        });
+        activeSessions.delete(session.id);
+        const currentSession = sessionsByKind.get(kind);
+        if (currentSession && currentSession.id === session.id) {
+            sessionsByKind.delete(kind);
+        }
+    });
+
+    if (interactive && Array.isArray(plan.initialCommands) && plan.initialCommands.length > 0) {
+        sendInteractiveCommands(session, plan.initialCommands);
+    }
+
+    return session;
+}
+
 function init(server, wsPath = '/flashdebug') {
     flashDebugPath = wsPath;
     flashDebugWss = new WebSocket.Server({
@@ -1300,119 +2019,103 @@ function init(server, wsPath = '/flashdebug') {
     });
 
     flashDebugWss.on('connection', (ws, req) => {
-        let activeSession = null;
+        const sessionsByKind = new Map();
+        const getSession = (kind) => sessionsByKind.get(kind) || null;
+        const stopKind = (kind, reason = '用户停止') => {
+            const session = getSession(kind);
+            if (session) {
+                stopSession(session, reason);
+            }
+        };
+        const stopAllKinds = (reason = '连接已关闭') => {
+            Array.from(sessionsByKind.values()).forEach((session) => {
+                stopSession(session, reason);
+            });
+        };
 
         ws.on('message', (message) => {
+            let payload = null;
             try {
-                const payload = JSON.parse(message.toString());
+                payload = JSON.parse(message.toString());
 
                 if (payload.type === 'stop') {
-                    if (activeSession) {
-                        stopSession(activeSession);
+                    const sessionKind = normalizeString(payload.sessionKind, '会话类型', 32).toLowerCase();
+                    if (sessionKind) {
+                        stopKind(sessionKind);
+                    } else {
+                        stopAllKinds('用户停止');
                     }
                     return;
                 }
 
-                if (payload.type !== 'start') {
-                    sendJson(ws, { type: 'error', message: '不支持的操作类型' });
+                if (payload.type === 'start') {
+                    const plan = buildExecutionPlan(payload);
+                    stopKind('flash', plan.action === 'flash' ? '新的操作已接管当前会话' : '新的调试服务已接管当前烧录会话');
+                    stopKind('debug', plan.action === 'debug' ? '新的操作已接管当前会话' : '新的烧录会话已接管当前调试服务');
+                    launchProcessSession({
+                        ws,
+                        sessionsByKind,
+                        kind: plan.action,
+                        plan,
+                        interactive: false
+                    });
                     return;
                 }
 
-                if (activeSession) {
-                    stopSession(activeSession, '新的操作已接管当前会话');
+                if (payload.type === 'cli-start') {
+                    stopKind('cli', '新的 CLI 会话已接管当前会话');
+                    const plan = buildGdbSessionPlan(payload);
+                    launchProcessSession({
+                        ws,
+                        sessionsByKind,
+                        kind: 'cli',
+                        plan,
+                        interactive: true
+                    });
+                    return;
                 }
 
-                const plan = buildExecutionPlan(payload);
-                const sessionId = `flashdebug_${typeof crypto.randomUUID === 'function'
-                    ? crypto.randomUUID()
-                    : crypto.randomBytes(16).toString('hex')}`;
-
-                const child = spawn(plan.executablePath, plan.args, {
-                    cwd: process.cwd(),
-                    env: plan.env || process.env,
-                    stdio: ['ignore', 'pipe', 'pipe'],
-                    windowsHide: !(plan.elevation && plan.elevation.interactiveWindow)
-                });
-
-                activeSession = {
-                    id: sessionId,
-                    ws,
-                    process: child,
-                    action: plan.action,
-                    tool: plan.tool
-                };
-                activeSessions.set(sessionId, activeSession);
-
-                sendJson(ws, {
-                    type: 'started',
-                    sessionId,
-                    action: plan.action,
-                    tool: plan.tool,
-                    pid: child.pid,
-                    command: plan.preview
-                });
-
-                for (const note of plan.notes) {
-                    sendJson(ws, {
-                        type: 'output',
-                        sessionId,
-                        action: plan.action,
-                        stream: 'system',
-                        data: `[system] ${note}\n`
-                    });
-                }
-
-                child.stdout.on('data', (chunk) => {
-                    sendJson(ws, {
-                        type: 'output',
-                        sessionId,
-                        action: plan.action,
-                        stream: 'stdout',
-                        data: chunk.toString('utf8')
-                    });
-                });
-
-                child.stderr.on('data', (chunk) => {
-                    sendJson(ws, {
-                        type: 'output',
-                        sessionId,
-                        action: plan.action,
-                        stream: 'stderr',
-                        data: chunk.toString('utf8')
-                    });
-                });
-
-                child.on('error', (err) => {
-                    sendJson(ws, {
-                        type: 'error',
-                        sessionId,
-                        action: plan.action,
-                        message: err.message
-                    });
-                });
-
-                child.on('close', (code, signal) => {
-                    sendJson(ws, {
-                        type: 'exit',
-                        sessionId,
-                        action: plan.action,
-                        exitCode: code ?? 0,
-                        signal: signal || null
-                    });
-                    activeSessions.delete(sessionId);
-                    if (activeSession && activeSession.id === sessionId) {
-                        activeSession = null;
+                if (payload.type === 'cli-command') {
+                    const session = getSession('cli');
+                    if (!session) {
+                        throw new Error('CLI 会话尚未启动');
                     }
-                });
+                    sendInteractiveCommands(session, buildGdbCliCommandList(payload));
+                    return;
+                }
+
+                if (payload.type === 'native-start') {
+                    stopKind('native', '新的 probe-rs 原生命令已接管当前会话');
+                    const plan = buildProbeRsNativePlan(payload);
+                    launchProcessSession({
+                        ws,
+                        sessionsByKind,
+                        kind: 'native',
+                        plan,
+                        interactive: false
+                    });
+                    return;
+                }
+
+                sendJson(ws, { type: 'error', message: '不支持的操作类型' });
             } catch (err) {
-                sendJson(ws, { type: 'error', message: err.message });
+                const sessionKind = payload && payload.sessionKind
+                    ? normalizeString(payload.sessionKind, '会话类型', 32).toLowerCase()
+                    : null;
+                const action = payload && payload.action
+                    ? normalizeString(payload.action, '操作类型', 32).toLowerCase()
+                    : null;
+                sendJson(ws, {
+                    type: 'error',
+                    sessionKind,
+                    action,
+                    message: err.message
+                });
             }
         });
 
         ws.on('close', () => {
-            if (activeSession) {
-                stopSession(activeSession, '连接已关闭');
-            }
+            stopAllKinds('连接已关闭');
         });
 
         ws.on('error', () => {});

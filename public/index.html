@@ -681,6 +681,51 @@
             background: var(--terminal-screen-bg);
         }
         .flashdebug-hidden { display: none !important; }
+        .flashdebug-cli-panel {
+            margin-top: 16px;
+            display: grid;
+            gap: 12px;
+        }
+        .flashdebug-command-group {
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .flashdebug-command-group-title {
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .flashdebug-command-group-subtitle {
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--color-text-3);
+            line-height: 1.5;
+        }
+        .flashdebug-command-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .flashdebug-command-grid .input-group { min-width: 0; }
+        .flashdebug-command-grid .input-group.wide { grid-column: 1 / -1; }
+        .flashdebug-quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .flashdebug-quick-actions .btn {
+            min-width: 0;
+        }
+        .flashdebug-command-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
         @media (max-width: 1100px) {
             .flashdebug-switchbar { grid-template-columns: 1fr; }
             .feature-tag-group { justify-self: start; }
@@ -2514,6 +2559,213 @@
                                 <pre id="debugLogOutput"></pre>
                             </details>
                         </div>
+                        <div class="flashdebug-card" id="flashDebugCliCard">
+                            <div class="flashdebug-card-header">
+                                <div>
+                                    <div class="flashdebug-card-title">CLI 操作</div>
+                                    <div class="flashdebug-card-subtitle">在调试服务启动后，通过 GDB CLI 与 tool-specific CLI 执行调试命令，并保留原始输出。</div>
+                                </div>
+                                <span class="flashdebug-card-status" id="cliStatusBadge"><i class="fas fa-circle"></i> 空闲</span>
+                            </div>
+                            <div class="flashdebug-grid">
+                                <div class="input-group">
+                                    <label>GDB 路径</label>
+                                    <input type="text" class="form-input" id="cliGdbPath" placeholder="留空自动探测 arm-none-eabi-gdb / gdb-multiarch / gdb">
+                                    <div class="flashdebug-field-note" id="cliGdbHint">CLI 会话会优先自动探测常见 GDB；若你使用交叉 GDB，可手动填写绝对路径。</div>
+                                </div>
+                                <div class="input-group">
+                                    <label>远端主机</label>
+                                    <input type="text" class="form-input" id="cliHostInput" value="127.0.0.1" placeholder="127.0.0.1">
+                                </div>
+                                <div class="input-group">
+                                    <label>远端端口</label>
+                                    <input type="number" class="form-input" id="cliPortInput" value="3333" min="1" max="65535">
+                                </div>
+                                <div class="input-group wide">
+                                    <label>ELF / 符号文件</label>
+                                    <input type="text" class="form-input" id="cliElfPath" placeholder="启动 CLI 会话时可自动执行 file 或 symbol-file">
+                                </div>
+                                <div class="input-group wide">
+                                    <div class="flashdebug-checkbox-row">
+                                        <label><input type="checkbox" id="cliAutoFile" checked> 启动后自动载入 file</label>
+                                        <label><input type="checkbox" id="cliUseSymbolFile"> 改用 symbol-file</label>
+                                        <label><input type="checkbox" id="cliAutoConnect" checked> 启动后自动连接 target extended-remote</label>
+                                    </div>
+                                    <div class="flashdebug-field-note">该卡片会把发送的 CLI 命令和 stdout/stderr 原样写入下方消息框；OpenOCD / pyOCD 独占 monitor 区只在对应 debugger 下显示。</div>
+                                </div>
+                            </div>
+                            <div class="flashdebug-actions">
+                                <button class="btn btn-danger" id="cliStopBtn" disabled><i class="fas fa-stop"></i> 停止 CLI</button>
+                                <button class="btn btn-secondary" id="cliClearLogBtn"><i class="fas fa-eraser"></i> 清空日志</button>
+                                <button class="btn btn-success" id="cliStartBtn"><i class="fas fa-terminal"></i> 启动 CLI</button>
+                            </div>
+                            <div class="flashdebug-cli-panel">
+                                <div class="flashdebug-command-group">
+                                    <div class="flashdebug-command-group-title">GDB 常用快捷命令</div>
+                                    <div class="flashdebug-command-group-subtitle">第一版优先覆盖会话、运行控制、断点、调用栈、寄存器和常用反汇编命令。</div>
+                                    <div class="flashdebug-quick-actions">
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="file"><i class="fas fa-file-code"></i> file</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="target-extended-remote"><i class="fas fa-plug"></i> connect</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="disconnect"><i class="fas fa-unlink"></i> disconnect</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="load"><i class="fas fa-download"></i> load</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="continue"><i class="fas fa-play"></i> continue</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="interrupt"><i class="fas fa-pause"></i> interrupt</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="step"><i class="fas fa-shoe-prints"></i> step</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="next"><i class="fas fa-forward-step"></i> next</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="finish"><i class="fas fa-flag-checkered"></i> finish</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="backtrace"><i class="fas fa-layer-group"></i> backtrace</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="info-breakpoints"><i class="fas fa-circle-dot"></i> info breakpoints</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="info-registers"><i class="fas fa-microchip"></i> info registers</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="info-all-registers"><i class="fas fa-list"></i> info all-registers</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="pc-instructions"><i class="fas fa-code"></i> x/8i $pc</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="compare-sections"><i class="fas fa-not-equal"></i> compare-sections</button>
+                                        <button class="btn btn-sm btn-secondary" data-gdb-command="quit"><i class="fas fa-power-off"></i> quit</button>
+                                    </div>
+                                </div>
+                                <div class="flashdebug-command-group">
+                                    <div class="flashdebug-command-group-title">GDB 命令构造器</div>
+                                    <div class="flashdebug-command-group-subtitle">按命令模板填写参数，生成并执行 GDB CLI；支持 run to cursor、monitor 透传、断点/观察点、内存、寄存器等命令。</div>
+                                    <div class="flashdebug-command-grid">
+                                        <div class="input-group">
+                                            <label>命令模板</label>
+                                            <select class="form-input" id="cliCommandSelect"></select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label id="cliCommandArg1Label">参数 1</label>
+                                            <input type="text" class="form-input" id="cliCommandArg1" placeholder="">
+                                        </div>
+                                        <div class="input-group">
+                                            <label id="cliCommandArg2Label">参数 2</label>
+                                            <input type="text" class="form-input" id="cliCommandArg2" placeholder="">
+                                        </div>
+                                        <div class="input-group">
+                                            <label id="cliCommandArg3Label">参数 3</label>
+                                            <input type="text" class="form-input" id="cliCommandArg3" placeholder="">
+                                        </div>
+                                        <div class="input-group">
+                                            <label id="cliCommandArg4Label">参数 4</label>
+                                            <input type="text" class="form-input" id="cliCommandArg4" placeholder="">
+                                        </div>
+                                        <div class="input-group wide">
+                                            <div class="flashdebug-field-note" id="cliCommandHint"></div>
+                                        </div>
+                                    </div>
+                                    <div class="flashdebug-command-actions">
+                                        <button class="btn btn-success" id="cliExecuteBtn"><i class="fas fa-paper-plane"></i> 执行 GDB 命令</button>
+                                    </div>
+                                </div>
+                                <div class="flashdebug-command-group flashdebug-hidden" id="openocdCliGroup">
+                                    <div class="flashdebug-command-group-title">OpenOCD monitor</div>
+                                    <div class="flashdebug-command-group-subtitle">以下命令会通过 `monitor ...` 透传到当前 OpenOCD 调试后端。</div>
+                                    <div class="flashdebug-quick-actions">
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="reset">reset</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="reset halt">reset halt</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="halt">halt</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="resume">resume</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="soft_reset_halt">soft_reset_halt</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="reg">reg</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="flash probe 0">flash probe 0</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="help">help</button>
+                                    </div>
+                                    <div class="flashdebug-command-grid">
+                                        <div class="input-group">
+                                            <label>monitor 原始命令</label>
+                                            <input type="text" class="form-input" id="openocdMonitorRaw" placeholder="例如 mdw 0x08000000 或 mww 0x20000000 0x12345678">
+                                        </div>
+                                    </div>
+                                    <div class="flashdebug-command-actions">
+                                        <button class="btn btn-success" id="openocdMonitorExecuteBtn"><i class="fas fa-terminal"></i> 执行 monitor</button>
+                                    </div>
+                                </div>
+                                <div class="flashdebug-command-group flashdebug-hidden" id="pyocdCliGroup">
+                                    <div class="flashdebug-command-group-title">pyOCD monitor</div>
+                                    <div class="flashdebug-command-group-subtitle">以下命令会通过 `monitor ...` 透传到当前 pyOCD GDB server。</div>
+                                    <div class="flashdebug-quick-actions">
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="reset">reset</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="halt">halt</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="resume">resume</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="reset halt">reset halt</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="erase all">erase all</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="unlock">unlock</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="status">status</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="reg">reg</button>
+                                        <button class="btn btn-sm btn-secondary" data-monitor-command="help">help</button>
+                                    </div>
+                                    <div class="flashdebug-command-grid">
+                                        <div class="input-group">
+                                            <label>monitor 原始命令</label>
+                                            <input type="text" class="form-input" id="pyocdMonitorRaw" placeholder="例如 status 或 reg">
+                                        </div>
+                                    </div>
+                                    <div class="flashdebug-command-actions">
+                                        <button class="btn btn-success" id="pyocdMonitorExecuteBtn"><i class="fas fa-terminal"></i> 执行 monitor</button>
+                                    </div>
+                                </div>
+                                <div class="flashdebug-command-group flashdebug-hidden" id="probeRsCliGroup">
+                                    <div class="flashdebug-command-group-title">probe-rs 原生命令</div>
+                                    <div class="flashdebug-command-group-subtitle">这里只执行 `probe-rs` 自身的 CLI 子命令；适合 probe 枚举、info/reset、download/verify/erase、read/write/trace/attach RTT。执行时会把原始 stdout/stderr 写入消息框。</div>
+                                    <div class="flashdebug-quick-actions">
+                                        <button class="btn btn-sm btn-secondary" data-probe-rs-command="probe-list"><i class="fas fa-usb"></i> list</button>
+                                        <button class="btn btn-sm btn-secondary" data-probe-rs-command="probe-info"><i class="fas fa-circle-info"></i> info</button>
+                                        <button class="btn btn-sm btn-secondary" data-probe-rs-command="probe-reset"><i class="fas fa-rotate-left"></i> reset</button>
+                                        <button class="btn btn-sm btn-secondary" data-probe-rs-command="probe-erase"><i class="fas fa-broom"></i> erase</button>
+                                    </div>
+                                    <div class="flashdebug-command-grid">
+                                        <div class="input-group">
+                                            <label>probe-rs 命令模板</label>
+                                            <select class="form-input" id="probeRsCommandSelect"></select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label>协议</label>
+                                            <select class="form-input" id="probeRsProtocol">
+                                                <option value="">自动 / 默认</option>
+                                                <option value="swd">SWD</option>
+                                                <option value="jtag">JTAG</option>
+                                            </select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Core</label>
+                                            <input type="number" class="form-input" id="probeRsCore" value="0" min="0" max="255">
+                                        </div>
+                                        <div class="input-group wide">
+                                            <label id="probeRsArg1Label">命令参数 1</label>
+                                            <input type="text" class="form-input" id="probeRsArg1" placeholder="">
+                                        </div>
+                                        <div class="input-group">
+                                            <label id="probeRsArg2Label">命令参数 2</label>
+                                            <input type="text" class="form-input" id="probeRsArg2" placeholder="">
+                                        </div>
+                                        <div class="input-group">
+                                            <label id="probeRsArg3Label">命令参数 3</label>
+                                            <input type="text" class="form-input" id="probeRsArg3" placeholder="">
+                                        </div>
+                                        <div class="input-group">
+                                            <label id="probeRsArg4Label">命令参数 4</label>
+                                            <input type="text" class="form-input" id="probeRsArg4" placeholder="">
+                                        </div>
+                                        <div class="input-group wide">
+                                            <div class="flashdebug-checkbox-row">
+                                                <label><input type="checkbox" id="probeRsUnderReset"> Under Reset Attach</label>
+                                                <label><input type="checkbox" id="probeRsVerifyAfterLoad"> Verify Flash</label>
+                                                <label><input type="checkbox" id="probeRsChipErase"> Chip Erase</label>
+                                            </div>
+                                            <div class="flashdebug-field-note" id="probeRsCommandHint"></div>
+                                        </div>
+                                    </div>
+                                    <div class="flashdebug-command-actions">
+                                        <button class="btn btn-danger" id="probeRsStopBtn" disabled><i class="fas fa-stop"></i> 停止 probe-rs</button>
+                                        <button class="btn btn-success" id="probeRsExecuteBtn"><i class="fas fa-play"></i> 执行 probe-rs</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <details class="flashdebug-log" id="cliLogDetails">
+                                <summary>
+                                    <span><i class="fas fa-terminal"></i> CLI 消息框</span>
+                                    <span>GDB / probe-rs 原始输出</span>
+                                </summary>
+                                <pre id="cliLogOutput"></pre>
+                            </details>
+                        </div>
                         <datalist id="flashDebugSpeedOptions">
                             <option value="1000"></option>
                             <option value="2000"></option>
@@ -2669,7 +2921,7 @@
             <div class="about-modal-content">
                 <div class="about-item">
                     <span class="about-label">版本号</span>
-                    <strong id="aboutVersionValue">0.1.8</strong>
+                    <strong id="aboutVersionValue">0.1.9-beta</strong>
                 </div>
                 <div class="about-item">
                     <span class="about-label">项目信息</span>
@@ -2717,7 +2969,7 @@
             isNologin: false,
             username: '',
             token: '',
-            appVersion: '0.1.8',
+            appVersion: '0.1.9-beta',
             projectHomepage: 'https://github.com/fcanlnony/Entrance',
             desktopVersion: '',
             desktopProjectHomepage: 'https://github.com/EntranceToolBox/Entrance-Desktop',
@@ -5951,7 +6203,9 @@
             tooling: null,
             running: {
                 flash: false,
-                debug: false
+                debug: false,
+                cli: false,
+                native: false
             },
             presets: {
                 openocd: {
@@ -6012,6 +6266,229 @@
                     verifyHint: 'probe-rs 的写后校验沿用当前 CLI 默认行为。'
                 }
             },
+            gdbCommandSpecs: {
+                'file': {
+                    label: 'file <elf-path>',
+                    hint: '载入 ELF，适合在启动 GDB CLI 后绑定当前目标程序。',
+                    fields: [{ key: 'arg1', label: 'ELF 路径', placeholder: '例如 /tmp/app.elf' }]
+                },
+                'symbol-file': {
+                    label: 'symbol-file <elf-path>',
+                    hint: '只载入符号文件，不替换当前 executable。',
+                    fields: [{ key: 'arg1', label: '符号文件路径', placeholder: '例如 /tmp/app.elf' }]
+                },
+                'target-extended-remote': {
+                    label: 'target extended-remote <host:port>',
+                    hint: '连接到当前实时调试服务暴露的 GDB Remote 端口。',
+                    fields: [
+                        { key: 'arg1', label: '主机', placeholder: '例如 127.0.0.1' },
+                        { key: 'arg2', label: '端口', placeholder: '例如 3333 或 1337' }
+                    ]
+                },
+                'disconnect': { label: 'disconnect', hint: '断开当前 remote target 连接。', fields: [] },
+                'load': { label: 'load', hint: '向目标装载当前 file/symbol-file 关联的 ELF。', fields: [] },
+                'compare-sections': { label: 'compare-sections', hint: '对比 ELF 与目标端的 section 内容。', fields: [] },
+                'quit': { label: 'quit', hint: '退出当前 GDB CLI 会话。', fields: [] },
+                'continue': { label: 'continue', hint: '继续运行目标程序。', fields: [] },
+                'interrupt': { label: 'interrupt', hint: '中断当前程序执行。', fields: [] },
+                'step': { label: 'step', hint: '单步进入。', fields: [] },
+                'next': { label: 'next', hint: '单步越过。', fields: [] },
+                'finish': { label: 'finish', hint: '运行到当前函数返回。', fields: [] },
+                'until': {
+                    label: 'until <location>',
+                    hint: '运行到指定位置后停止。',
+                    fields: [{ key: 'arg1', label: '位置', placeholder: '例如 main.c:128 或 func' }]
+                },
+                'jump': {
+                    label: 'jump <location>',
+                    hint: '跳转到指定源码位置或 `*0x...` 地址。',
+                    fields: [{ key: 'arg1', label: '跳转位置', placeholder: '例如 main.c:256 或 *0x08000100' }]
+                },
+                'break': {
+                    label: 'break <function|file:line>',
+                    hint: '支持函数名或 文件:行号。',
+                    fields: [{ key: 'arg1', label: '断点位置', placeholder: '例如 foo 或 main.c:42' }]
+                },
+                'tbreak': {
+                    label: 'tbreak <location>',
+                    hint: '一次性断点，命中后自动删除。',
+                    fields: [{ key: 'arg1', label: '临时断点位置', placeholder: '例如 main.c:88' }]
+                },
+                'hbreak': {
+                    label: 'hbreak <location>',
+                    hint: '硬件断点；受硬件资源数量限制。',
+                    fields: [{ key: 'arg1', label: '硬件断点位置', placeholder: '例如 main.c:88' }]
+                },
+                'info-breakpoints': { label: 'info breakpoints', hint: '列出当前全部断点/观察点。', fields: [] },
+                'delete': {
+                    label: 'delete [breakpoint-id]',
+                    hint: '留空等价于 `delete`，会删除全部断点。',
+                    fields: [{ key: 'arg1', label: '断点 ID', placeholder: '留空则删除全部断点' }]
+                },
+                'disable': {
+                    label: 'disable <breakpoint-id>',
+                    hint: '禁用指定断点。',
+                    fields: [{ key: 'arg1', label: '断点 ID', placeholder: '例如 3' }]
+                },
+                'enable': {
+                    label: 'enable <breakpoint-id>',
+                    hint: '启用指定断点。',
+                    fields: [{ key: 'arg1', label: '断点 ID', placeholder: '例如 3' }]
+                },
+                'condition': {
+                    label: 'condition <id> <expr>',
+                    hint: '为断点附加条件表达式。',
+                    fields: [
+                        { key: 'arg1', label: '断点 ID', placeholder: '例如 3' },
+                        { key: 'arg2', label: '条件表达式', placeholder: '例如 counter > 10' }
+                    ]
+                },
+                'ignore': {
+                    label: 'ignore <id> <count>',
+                    hint: '让指定断点先忽略前 N 次命中。',
+                    fields: [
+                        { key: 'arg1', label: '断点 ID', placeholder: '例如 3' },
+                        { key: 'arg2', label: '忽略次数', placeholder: '例如 5' }
+                    ]
+                },
+                'watch': { label: 'watch <expr>', hint: '写观察点。', fields: [{ key: 'arg1', label: '表达式', placeholder: '例如 some_var' }] },
+                'rwatch': { label: 'rwatch <expr>', hint: '读观察点。', fields: [{ key: 'arg1', label: '表达式', placeholder: '例如 some_var' }] },
+                'awatch': { label: 'awatch <expr>', hint: '读写观察点。', fields: [{ key: 'arg1', label: '表达式', placeholder: '例如 some_var' }] },
+                'backtrace': { label: 'backtrace', hint: '输出当前调用栈。', fields: [] },
+                'frame': { label: 'frame <n>', hint: '切换到指定栈帧。', fields: [{ key: 'arg1', label: '栈帧号', placeholder: '例如 0' }] },
+                'up': { label: 'up', hint: '移动到上一个栈帧。', fields: [] },
+                'down': { label: 'down', hint: '移动到下一个栈帧。', fields: [] },
+                'info-frame': { label: 'info frame', hint: '显示当前栈帧详细信息。', fields: [] },
+                'info-args': { label: 'info args', hint: '显示当前函数参数。', fields: [] },
+                'info-locals': { label: 'info locals', hint: '显示当前函数局部变量。', fields: [] },
+                'print': { label: 'print <expr>', hint: '按默认格式打印表达式。', fields: [{ key: 'arg1', label: '表达式', placeholder: '例如 var' }] },
+                'print-hex': { label: 'p/x <expr>', hint: '按十六进制打印表达式。', fields: [{ key: 'arg1', label: '表达式', placeholder: '例如 var' }] },
+                'print-dec': { label: 'p/d <expr>', hint: '按十进制打印表达式。', fields: [{ key: 'arg1', label: '表达式', placeholder: '例如 var' }] },
+                'print-bin': { label: 'p/t <expr>', hint: '按二进制打印表达式。', fields: [{ key: 'arg1', label: '表达式', placeholder: '例如 flags' }] },
+                'display': { label: 'display <expr>', hint: '持续显示表达式。', fields: [{ key: 'arg1', label: '表达式', placeholder: '例如 var' }] },
+                'undisplay': { label: 'undisplay <id>', hint: '取消指定 display 项。', fields: [{ key: 'arg1', label: 'Display ID', placeholder: '例如 1' }] },
+                'set-variable': {
+                    label: 'set variable <var>=<value>',
+                    hint: '直接修改变量值。',
+                    fields: [
+                        { key: 'arg1', label: '变量名', placeholder: '例如 counter' },
+                        { key: 'arg2', label: '值', placeholder: '例如 123' }
+                    ]
+                },
+                'whatis': { label: 'whatis <expr>', hint: '查看表达式的类型名。', fields: [{ key: 'arg1', label: '表达式', placeholder: '例如 foo' }] },
+                'ptype': { label: 'ptype <expr>', hint: '显示表达式/类型的完整类型定义。', fields: [{ key: 'arg1', label: '表达式或类型', placeholder: '例如 foo' }] },
+                'info-registers': { label: 'info registers', hint: '显示核心寄存器。', fields: [] },
+                'info-all-registers': { label: 'info all-registers', hint: '显示全部寄存器。', fields: [] },
+                'print-register': {
+                    label: 'print $pc/$sp/$lr/$xpsr',
+                    hint: '快速打印单个寄存器值。',
+                    fields: [{ key: 'arg1', label: '寄存器名', placeholder: '例如 pc、sp、lr、xpsr' }]
+                },
+                'set-register': {
+                    label: 'set $reg = <value>',
+                    hint: '修改 PC / SP 等寄存器。',
+                    fields: [
+                        { key: 'arg1', label: '寄存器名', placeholder: '例如 pc 或 sp' },
+                        { key: 'arg2', label: '值', placeholder: '例如 0x08000000' }
+                    ]
+                },
+                'examine-memory': {
+                    label: 'x/<count>{b|h|w|i[x]} <address>',
+                    hint: '格式填写 b/h/w/i；例如 32 + b + 0x20000000 对应 x/32bx。',
+                    fields: [
+                        { key: 'arg1', label: '数量', placeholder: '例如 32' },
+                        { key: 'arg2', label: '格式', placeholder: 'b / h / w / i' },
+                        { key: 'arg3', label: '地址', placeholder: '例如 0x20000000' }
+                    ]
+                },
+                'set-memory': {
+                    label: 'set {<type>}<address> = <value>',
+                    hint: '可用于向 RAM 或寄存器映射地址写值。',
+                    fields: [
+                        { key: 'arg1', label: '类型', placeholder: '例如 uint32_t' },
+                        { key: 'arg2', label: '地址', placeholder: '例如 0x20000000' },
+                        { key: 'arg3', label: '值', placeholder: '例如 0x12345678' }
+                    ]
+                },
+                'dump-binary-memory': {
+                    label: 'dump binary memory <file> <start> <end>',
+                    hint: '把目标内存导出为 binary。',
+                    fields: [
+                        { key: 'arg1', label: '导出文件', placeholder: '例如 /tmp/ram.bin' },
+                        { key: 'arg2', label: '起始地址', placeholder: '例如 0x20000000' },
+                        { key: 'arg3', label: '结束地址', placeholder: '例如 0x20000100' }
+                    ]
+                },
+                'restore-binary': {
+                    label: 'restore <file> binary <address>',
+                    hint: '从 binary 文件恢复到目标内存。',
+                    fields: [
+                        { key: 'arg1', label: '导入文件', placeholder: '例如 /tmp/ram.bin' },
+                        { key: 'arg2', label: '装载地址', placeholder: '例如 0x20000000' }
+                    ]
+                },
+                'disassemble': { label: 'disassemble [location]', hint: '留空时反汇编当前上下文。', fields: [{ key: 'arg1', label: '位置', placeholder: '可选，例如 main' }] },
+                'disassemble-mixed': { label: 'disassemble /m <location>', hint: '混合源码与汇编。', fields: [{ key: 'arg1', label: '位置', placeholder: '例如 main' }] },
+                'disassemble-raw': { label: 'disassemble /r <location>', hint: '附带原始机器码。', fields: [{ key: 'arg1', label: '位置', placeholder: '例如 main' }] },
+                'list': { label: 'list [location]', hint: '留空时显示当前位置源码。', fields: [{ key: 'arg1', label: '位置', placeholder: '可选，例如 main.c:128' }] },
+                'monitor-raw': { label: 'monitor <raw-command>', hint: 'OpenOCD / pyOCD 专用透传；probe-rs 下不会显示独占快捷区。', fields: [{ key: 'arg1', label: 'monitor 命令', placeholder: '例如 reset halt' }] },
+                'pc-instructions': { label: 'x/8i $pc', hint: '查看当前 PC 附近 8 条指令。', fields: [] },
+                'run-to-cursor': { label: 'Run To Cursor', hint: '内部会执行 `tbreak <file>:<line>` 再 `continue`。', fields: [{ key: 'arg1', label: '文件:行号', placeholder: '例如 main.c:200' }] }
+            },
+            probeRsCommandSpecs: {
+                'probe-list': { label: 'probe-rs list', hint: '枚举当前已连接 probe。', fields: [] },
+                'probe-info': { label: 'probe-rs info', hint: '查询 probe 与 target 状态，等价 session state query / target info。', fields: [] },
+                'probe-reset': { label: 'probe-rs reset', hint: '复位目标，可配合 Under Reset 连接。', fields: [] },
+                'probe-erase': { label: 'probe-rs erase', hint: '整片擦除。', fields: [] },
+                'probe-download': {
+                    label: 'probe-rs download',
+                    hint: '下载 ELF / BIN / HEX；可结合 Verify Flash 与 Chip Erase。',
+                    fields: [
+                        { key: 'arg1', label: '文件路径', placeholder: '例如 /tmp/app.elf 或 /tmp/app.bin' },
+                        { key: 'arg2', label: 'Binary 格式', placeholder: '可选，例如 bin / elf / hex' },
+                        { key: 'arg3', label: '基地址', placeholder: 'bin 时可填，例如 0x08000000' },
+                        { key: 'arg4', label: '跳过字节', placeholder: '可选，例如 0' }
+                    ]
+                },
+                'probe-verify': {
+                    label: 'probe-rs verify',
+                    hint: '对比文件与目标 flash 内容。',
+                    fields: [
+                        { key: 'arg1', label: '文件路径', placeholder: '例如 /tmp/app.elf' },
+                        { key: 'arg2', label: 'Binary 格式', placeholder: '可选，例如 bin / elf / hex' },
+                        { key: 'arg3', label: '基地址', placeholder: 'bin 时可填，例如 0x08000000' },
+                        { key: 'arg4', label: '跳过字节', placeholder: '可选，例如 0' }
+                    ]
+                },
+                'probe-read': {
+                    label: 'probe-rs read',
+                    hint: '读取 RAM / 外设内存；宽度支持 b8 / b16 / b32 / b64。',
+                    fields: [
+                        { key: 'arg1', label: '宽度', placeholder: '例如 b32' },
+                        { key: 'arg2', label: '地址', placeholder: '例如 0x20000000' },
+                        { key: 'arg3', label: '数量', placeholder: '例如 4' }
+                    ]
+                },
+                'probe-write': {
+                    label: 'probe-rs write',
+                    hint: '写 RAM / 外设内存；多个值用空格分隔。',
+                    fields: [
+                        { key: 'arg1', label: '宽度', placeholder: '例如 b32' },
+                        { key: 'arg2', label: '地址', placeholder: '例如 0x20000000' },
+                        { key: 'arg3', label: '写入值', placeholder: '例如 0x1 0x2 0x3' }
+                    ]
+                },
+                'probe-trace': {
+                    label: 'probe-rs trace',
+                    hint: '持续 trace 指定内存位置。',
+                    fields: [{ key: 'arg1', label: 'Trace 地址', placeholder: '例如 0x20000000' }]
+                },
+                'probe-attach': {
+                    label: 'probe-rs attach',
+                    hint: 'RTT / defmt 日志 attach；需要 ELF 路径。',
+                    fields: [{ key: 'arg1', label: 'ELF 路径', placeholder: '例如 /tmp/app.elf' }]
+                }
+            },
 
             init() {
                 if (this.initialized) return;
@@ -6067,6 +6544,33 @@
                 document.getElementById('debugStartBtn').addEventListener('click', () => this.startAction('debug'));
                 document.getElementById('debugStopBtn').addEventListener('click', () => this.stopAction('debug'));
                 document.getElementById('debugClearLogBtn').addEventListener('click', () => this.clearLog('debug'));
+                document.getElementById('cliStartBtn').addEventListener('click', () => this.startCliSession());
+                document.getElementById('cliStopBtn').addEventListener('click', () => this.stopAction('cli'));
+                document.getElementById('cliClearLogBtn').addEventListener('click', () => this.clearLog('cli'));
+                document.getElementById('probeRsStopBtn').addEventListener('click', () => this.stopAction('native'));
+                document.getElementById('cliExecuteBtn').addEventListener('click', () => this.executeCliCommand());
+                document.getElementById('openocdMonitorExecuteBtn').addEventListener('click', () => {
+                    this.executeCliCommand('monitor-raw', { arg1: document.getElementById('openocdMonitorRaw').value.trim() });
+                });
+                document.getElementById('pyocdMonitorExecuteBtn').addEventListener('click', () => {
+                    this.executeCliCommand('monitor-raw', { arg1: document.getElementById('pyocdMonitorRaw').value.trim() });
+                });
+                document.getElementById('probeRsExecuteBtn').addEventListener('click', () => this.executeProbeRsCommand());
+                document.getElementById('cliCommandSelect').addEventListener('change', () => this.updateCliCommandForm());
+                document.getElementById('probeRsCommandSelect').addEventListener('change', () => this.updateProbeRsCommandForm());
+                document.getElementById('debugPortInput').addEventListener('change', () => this.syncCliDefaults());
+                document.getElementById('debugElfPath').addEventListener('change', () => this.syncCliDefaults());
+                document.getElementById('debugElfPath').addEventListener('input', () => this.syncCliDefaults());
+
+                document.querySelectorAll('[data-gdb-command]').forEach((btn) => {
+                    btn.addEventListener('click', () => this.executeCliCommand(btn.dataset.gdbCommand));
+                });
+                document.querySelectorAll('#openocdCliGroup [data-monitor-command], #pyocdCliGroup [data-monitor-command]').forEach((btn) => {
+                    btn.addEventListener('click', () => this.executeCliCommand('monitor-raw', { arg1: btn.dataset.monitorCommand || '' }));
+                });
+                document.querySelectorAll('[data-probe-rs-command]').forEach((btn) => {
+                    btn.addEventListener('click', () => this.executeProbeRsCommand(btn.dataset.probeRsCommand));
+                });
                 document.getElementById('flashRequestElevation').addEventListener('change', (e) => {
                     document.getElementById('debugRequestElevation').checked = e.target.checked;
                 });
@@ -6074,15 +6578,112 @@
                     document.getElementById('flashRequestElevation').checked = e.target.checked;
                 });
 
+                this.populateCliCommandSelectors();
                 this.applyToolPreset();
                 this.applyMode(this.currentMode);
                 this.applyAccessState();
                 this.syncFirmwareUploadHint();
+                this.syncCliDefaults();
+                this.updateCliCommandForm();
+                this.updateProbeRsCommandForm();
                 this.refreshTooling(true);
             },
 
             isBusy() {
-                return this.running.flash || this.running.debug;
+                return this.running.flash || this.running.debug || this.running.cli || this.running.native;
+            },
+
+            populateCliCommandSelectors() {
+                const cliSelect = document.getElementById('cliCommandSelect');
+                const probeRsSelect = document.getElementById('probeRsCommandSelect');
+
+                cliSelect.innerHTML = '';
+                Object.entries(this.gdbCommandSpecs).forEach(([commandId, spec]) => {
+                    const option = document.createElement('option');
+                    option.value = commandId;
+                    option.textContent = spec.label;
+                    cliSelect.appendChild(option);
+                });
+
+                probeRsSelect.innerHTML = '';
+                Object.entries(this.probeRsCommandSpecs).forEach(([commandId, spec]) => {
+                    const option = document.createElement('option');
+                    option.value = commandId;
+                    option.textContent = spec.label;
+                    probeRsSelect.appendChild(option);
+                });
+            },
+
+            setDynamicField(labelId, inputId, field) {
+                const label = document.getElementById(labelId);
+                const input = document.getElementById(inputId);
+                if (!label || !input) return;
+
+                const group = input.closest('.input-group');
+                if (!field) {
+                    group.classList.add('flashdebug-hidden');
+                    input.value = '';
+                    input.placeholder = '';
+                    return;
+                }
+
+                group.classList.remove('flashdebug-hidden');
+                label.textContent = field.label;
+                input.placeholder = field.placeholder || '';
+            },
+
+            updateCliCommandForm() {
+                const select = document.getElementById('cliCommandSelect');
+                const spec = this.gdbCommandSpecs[select.value] || this.gdbCommandSpecs.file;
+                const fields = spec.fields || [];
+
+                this.setDynamicField('cliCommandArg1Label', 'cliCommandArg1', fields[0] || null);
+                this.setDynamicField('cliCommandArg2Label', 'cliCommandArg2', fields[1] || null);
+                this.setDynamicField('cliCommandArg3Label', 'cliCommandArg3', fields[2] || null);
+                this.setDynamicField('cliCommandArg4Label', 'cliCommandArg4', fields[3] || null);
+                document.getElementById('cliCommandHint').textContent = spec.hint || '';
+            },
+
+            updateProbeRsCommandForm() {
+                const select = document.getElementById('probeRsCommandSelect');
+                const spec = this.probeRsCommandSpecs[select.value] || this.probeRsCommandSpecs['probe-list'];
+                const fields = spec.fields || [];
+
+                this.setDynamicField('probeRsArg1Label', 'probeRsArg1', fields[0] || null);
+                this.setDynamicField('probeRsArg2Label', 'probeRsArg2', fields[1] || null);
+                this.setDynamicField('probeRsArg3Label', 'probeRsArg3', fields[2] || null);
+                this.setDynamicField('probeRsArg4Label', 'probeRsArg4', fields[3] || null);
+                document.getElementById('probeRsCommandHint').textContent = spec.hint || '';
+            },
+
+            syncCliToolPanels() {
+                document.getElementById('openocdCliGroup').classList.toggle('flashdebug-hidden', this.currentTool !== 'openocd');
+                document.getElementById('pyocdCliGroup').classList.toggle('flashdebug-hidden', this.currentTool !== 'pyocd');
+                document.getElementById('probeRsCliGroup').classList.toggle('flashdebug-hidden', this.currentTool !== 'probe-rs');
+
+                const commandSelect = document.getElementById('cliCommandSelect');
+                const monitorOption = commandSelect.querySelector('option[value="monitor-raw"]');
+                if (monitorOption) {
+                    monitorOption.hidden = this.currentTool === 'probe-rs';
+                }
+                if (this.currentTool === 'probe-rs' && commandSelect.value === 'monitor-raw') {
+                    commandSelect.value = 'continue';
+                    this.updateCliCommandForm();
+                }
+            },
+
+            syncCliDefaults(force = false) {
+                const cliPortInput = document.getElementById('cliPortInput');
+                const cliElfPath = document.getElementById('cliElfPath');
+                const debugPortInput = document.getElementById('debugPortInput');
+                const debugElfPath = document.getElementById('debugElfPath');
+
+                if (force || !cliPortInput.value.trim()) {
+                    cliPortInput.value = debugPortInput.value || cliPortInput.value;
+                }
+                if (force || !cliElfPath.value.trim()) {
+                    cliElfPath.value = debugElfPath.value.trim() || cliElfPath.value;
+                }
             },
 
             applyMode(mode) {
@@ -6092,6 +6693,7 @@
                 });
                 document.getElementById('flashDebugFlashCard').classList.toggle('active', this.currentMode === 'flash');
                 document.getElementById('flashDebugDebugCard').classList.toggle('active', this.currentMode === 'debug');
+                document.getElementById('flashDebugCliCard').classList.toggle('active', this.currentMode === 'debug');
             },
 
             applyAccessState() {
@@ -6104,12 +6706,24 @@
                 if (!this.initialized) return;
 
                 const locked = !State.isAdmin;
-                const busy = this.isBusy();
-                const generalIds = [
+                const anyActive = this.isBusy();
+                const serviceBusy = this.running.flash || this.running.debug || this.running.cli || this.running.native;
+                const cliSessionBusy = this.running.flash || this.running.cli || this.running.native;
+                const cliCommandLocked = locked || !this.running.cli || this.running.native;
+                const probeRsNativeLocked = locked
+                    || this.currentTool !== 'probe-rs'
+                    || this.running.flash
+                    || this.running.debug
+                    || this.running.cli
+                    || this.running.native;
+
+                const toolingIds = [
                     'flashDebugToolSelector',
                     'flashDebugRefreshBtn',
                     'flashDebugManualBtn',
-                    'flashDebugManualPath',
+                    'flashDebugManualPath'
+                ];
+                const flashIds = [
                     'flashProbeSelect',
                     'flashProbeInput',
                     'flashTargetInput',
@@ -6120,7 +6734,9 @@
                     'flashExtraArgs',
                     'flashRequestElevation',
                     'flashVerify',
-                    'flashReset',
+                    'flashReset'
+                ];
+                const debugIds = [
                     'debugProbeSelect',
                     'debugProbeInput',
                     'debugTargetInput',
@@ -6132,18 +6748,95 @@
                     'debugExtraArgs',
                     'debugRequestElevation'
                 ];
+                const cliSessionIds = [
+                    'cliGdbPath',
+                    'cliHostInput',
+                    'cliPortInput',
+                    'cliElfPath',
+                    'cliAutoFile',
+                    'cliUseSymbolFile',
+                    'cliAutoConnect'
+                ];
+                const cliCommandIds = [
+                    'cliCommandSelect',
+                    'cliCommandArg1',
+                    'cliCommandArg2',
+                    'cliCommandArg3',
+                    'cliCommandArg4',
+                    'cliExecuteBtn',
+                    'openocdMonitorRaw',
+                    'openocdMonitorExecuteBtn',
+                    'pyocdMonitorRaw',
+                    'pyocdMonitorExecuteBtn'
+                ];
+                const probeRsIds = [
+                    'probeRsCommandSelect',
+                    'probeRsProtocol',
+                    'probeRsCore',
+                    'probeRsArg1',
+                    'probeRsArg2',
+                    'probeRsArg3',
+                    'probeRsArg4',
+                    'probeRsUnderReset',
+                    'probeRsVerifyAfterLoad',
+                    'probeRsChipErase',
+                    'probeRsExecuteBtn'
+                ];
 
-                generalIds.forEach((id) => {
+                toolingIds.forEach((id) => {
                     const el = document.getElementById(id);
                     if (el) {
-                        el.disabled = locked || busy;
+                        el.disabled = locked || anyActive;
+                    }
+                });
+                flashIds.forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.disabled = locked || serviceBusy;
+                    }
+                });
+                debugIds.forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.disabled = locked || serviceBusy;
+                    }
+                });
+                cliSessionIds.forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.disabled = locked || cliSessionBusy;
+                    }
+                });
+                cliCommandIds.forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.disabled = cliCommandLocked;
+                    }
+                });
+                probeRsIds.forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.disabled = probeRsNativeLocked;
                     }
                 });
 
-                document.getElementById('flashStartBtn').disabled = locked || busy;
-                document.getElementById('debugStartBtn').disabled = locked || busy;
+                document.getElementById('flashStartBtn').disabled = locked || serviceBusy;
+                document.getElementById('debugStartBtn').disabled = locked || serviceBusy;
                 document.getElementById('flashStopBtn').disabled = locked || !this.running.flash;
                 document.getElementById('debugStopBtn').disabled = locked || !this.running.debug;
+                document.getElementById('cliStartBtn').disabled = locked || cliSessionBusy;
+                document.getElementById('cliStopBtn').disabled = locked || !this.running.cli;
+                document.getElementById('cliClearLogBtn').disabled = locked;
+                document.getElementById('probeRsStopBtn').disabled = locked || !this.running.native;
+                document.querySelectorAll('[data-gdb-command]').forEach((btn) => {
+                    btn.disabled = cliCommandLocked;
+                });
+                document.querySelectorAll('#openocdCliGroup [data-monitor-command], #pyocdCliGroup [data-monitor-command]').forEach((btn) => {
+                    btn.disabled = cliCommandLocked;
+                });
+                document.querySelectorAll('[data-probe-rs-command]').forEach((btn) => {
+                    btn.disabled = probeRsNativeLocked;
+                });
                 this.syncElevationUi();
             },
 
@@ -6177,6 +6870,8 @@
                     document.getElementById('debugTelnetPortInput').value = String(preset.defaultTelnetPort || 4444);
                 }
 
+                this.syncCliDefaults(true);
+                this.syncCliToolPanels();
                 this.syncHints();
             },
 
@@ -6560,6 +7255,146 @@
                 return options;
             },
 
+            collectCliSessionOptions() {
+                return {
+                    gdbPath: document.getElementById('cliGdbPath').value.trim(),
+                    host: document.getElementById('cliHostInput').value.trim() || '127.0.0.1',
+                    port: document.getElementById('cliPortInput').value.trim(),
+                    elfPath: document.getElementById('cliElfPath').value.trim(),
+                    autoFile: document.getElementById('cliAutoFile').checked,
+                    useSymbolFile: document.getElementById('cliUseSymbolFile').checked,
+                    autoConnect: document.getElementById('cliAutoConnect').checked
+                };
+            },
+
+            collectDynamicArgs(prefix) {
+                return {
+                    arg1: document.getElementById(`${prefix}Arg1`).value.trim(),
+                    arg2: document.getElementById(`${prefix}Arg2`).value.trim(),
+                    arg3: document.getElementById(`${prefix}Arg3`).value.trim(),
+                    arg4: document.getElementById(`${prefix}Arg4`).value.trim()
+                };
+            },
+
+            getDefaultCliValues(commandId) {
+                const defaults = {};
+                if (commandId === 'file' || commandId === 'symbol-file') {
+                    defaults.arg1 = document.getElementById('cliElfPath').value.trim();
+                } else if (commandId === 'target-extended-remote') {
+                    defaults.arg1 = document.getElementById('cliHostInput').value.trim() || '127.0.0.1';
+                    defaults.arg2 = document.getElementById('cliPortInput').value.trim();
+                }
+                return defaults;
+            },
+
+            async startCliSession() {
+                if (!State.isAdmin) {
+                    Toast.error('仅管理员可使用烧录调试功能');
+                    return;
+                }
+                if (this.running.flash || this.running.cli || this.running.native) {
+                    Toast.info('请先停止当前烧录 / CLI / probe-rs 原生命令任务');
+                    return;
+                }
+
+                try {
+                    await this.ensureSocket();
+                    const payload = Object.assign({ type: 'cli-start' }, this.collectCliSessionOptions());
+                    this.appendLog('cli', '\n[gui] 启动 GDB CLI 会话\n');
+                    this.ws.send(JSON.stringify(payload));
+                } catch (err) {
+                    this.appendLog('cli', `[error] ${err.message}\n`);
+                    Toast.error(err.message);
+                }
+            },
+
+            async executeCliCommand(commandId = null, overrideValues = null) {
+                if (!State.isAdmin) {
+                    Toast.error('仅管理员可使用烧录调试功能');
+                    return;
+                }
+                if (!this.running.cli) {
+                    Toast.info('请先启动 GDB CLI 会话');
+                    return;
+                }
+
+                const selectedCommand = commandId || document.getElementById('cliCommandSelect').value;
+                const selectedFromBuilder = document.getElementById('cliCommandSelect').value;
+                const values = Object.assign({}, this.getDefaultCliValues(selectedCommand));
+                if (!commandId || selectedCommand === selectedFromBuilder) {
+                    Object.entries(this.collectDynamicArgs('cliCommand')).forEach(([key, value]) => {
+                        if (value) {
+                            values[key] = value;
+                        }
+                    });
+                }
+                Object.entries(overrideValues || {}).forEach(([key, value]) => {
+                    if (value !== undefined) {
+                        values[key] = value;
+                    }
+                });
+
+                try {
+                    await this.ensureSocket();
+                    this.ws.send(JSON.stringify({
+                        type: 'cli-command',
+                        sessionKind: 'cli',
+                        commandId: selectedCommand,
+                        values
+                    }));
+                } catch (err) {
+                    this.appendLog('cli', `[error] ${err.message}\n`);
+                    Toast.error(err.message);
+                }
+            },
+
+            getProbeRsNativeContext() {
+                return {
+                    type: 'native-start',
+                    tool: this.currentTool,
+                    executablePath: this.getExecutablePathForRequest(),
+                    probeSelection: this.getProbeValue('debug'),
+                    target: document.getElementById('debugTargetInput').value.trim(),
+                    speed: document.getElementById('debugSpeedInput').value.trim(),
+                    protocol: document.getElementById('probeRsProtocol').value,
+                    core: document.getElementById('probeRsCore').value.trim(),
+                    connectUnderReset: document.getElementById('probeRsUnderReset').checked,
+                    verifyAfterLoad: document.getElementById('probeRsVerifyAfterLoad').checked,
+                    chipErase: document.getElementById('probeRsChipErase').checked
+                };
+            },
+
+            async executeProbeRsCommand(commandId = null) {
+                if (!State.isAdmin) {
+                    Toast.error('仅管理员可使用烧录调试功能');
+                    return;
+                }
+                if (this.currentTool !== 'probe-rs') {
+                    Toast.info('请选择 probe-rs 调试器后再执行原生命令');
+                    return;
+                }
+                if (this.running.flash || this.running.debug || this.running.cli || this.running.native) {
+                    Toast.info('probe-rs 原生命令执行前，请先停止当前烧录 / 调试 / CLI 会话');
+                    return;
+                }
+
+                const selectedCommand = commandId || document.getElementById('probeRsCommandSelect').value;
+                const payload = Object.assign({}, this.getProbeRsNativeContext(), {
+                    sessionKind: 'native',
+                    commandId: selectedCommand,
+                    values: this.collectDynamicArgs('probeRs')
+                });
+
+                try {
+                    await this.ensureSocket();
+                    this.appendLog('cli', `\n[gui] 执行 probe-rs 原生命令: ${selectedCommand}\n`);
+                    this.ws.send(JSON.stringify(payload));
+                } catch (err) {
+                    this.appendLog('cli', `[error] ${err.message}\n`);
+                    Toast.error(err.message);
+                }
+            },
+
             async ensureSocket() {
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                     return;
@@ -6595,8 +7430,11 @@
                         this.ws = null;
                         this.running.flash = false;
                         this.running.debug = false;
+                        this.running.cli = false;
+                        this.running.native = false;
                         this.updateStatusBadge('flash');
                         this.updateStatusBadge('debug');
+                        this.updateStatusBadge('cli');
                         this.syncControls();
                         if (!settled) {
                             settled = true;
@@ -6612,36 +7450,68 @@
             handleSocketMessage(event) {
                 try {
                     const msg = JSON.parse(event.data);
+                    const logAction = msg.action === 'cli' || msg.sessionKind === 'cli' || msg.sessionKind === 'native'
+                        ? 'cli'
+                        : (msg.action || this.currentMode);
                     switch (msg.type) {
-                        case 'started':
-                            this.running.flash = false;
-                            this.running.debug = false;
-                            this.running[msg.action] = true;
-                            this.updateStatusBadge(msg.action);
+                        case 'started': {
+                            if (msg.sessionKind === 'cli') {
+                                this.running.cli = true;
+                            } else if (msg.sessionKind === 'native') {
+                                this.running.native = true;
+                            } else if (msg.action === 'flash' || msg.action === 'debug') {
+                                this.running[msg.action] = true;
+                            }
+                            this.updateStatusBadge('flash');
+                            this.updateStatusBadge('debug');
+                            this.updateStatusBadge('cli');
                             this.syncControls();
-                            this.appendLog(msg.action, `\n[gui] ${msg.command}\n`);
-                            Toast.success(msg.action === 'flash' ? '烧录任务已启动' : '调试任务已启动');
+                            this.appendLog(logAction, `\n[gui] ${msg.command}\n`);
+                            if (msg.sessionKind === 'cli') {
+                                Toast.success('GDB CLI 会话已启动');
+                            } else if (msg.sessionKind === 'native') {
+                                Toast.success('probe-rs 原生命令已启动');
+                            } else {
+                                Toast.success(msg.action === 'flash' ? '烧录任务已启动' : '调试任务已启动');
+                            }
                             break;
+                        }
                         case 'output':
-                            this.appendLog(msg.action || this.currentMode, msg.data || '');
+                            this.appendLog(logAction, msg.data || '');
                             break;
                         case 'exit':
-                            this.running[msg.action] = false;
-                            this.updateStatusBadge(msg.action);
+                            if (msg.sessionKind === 'cli') {
+                                this.running.cli = false;
+                            } else if (msg.sessionKind === 'native') {
+                                this.running.native = false;
+                            } else if (msg.action === 'flash' || msg.action === 'debug') {
+                                this.running[msg.action] = false;
+                            }
+                            this.updateStatusBadge('flash');
+                            this.updateStatusBadge('debug');
+                            this.updateStatusBadge('cli');
                             this.syncControls();
                             this.appendLog(
-                                msg.action,
+                                logAction,
                                 `\n[exit] code=${msg.exitCode}${msg.signal ? ` signal=${msg.signal}` : ''}\n`
                             );
-                            Toast.info(msg.action === 'flash' ? '烧录任务已结束' : '调试任务已结束');
+                            if (msg.sessionKind === 'cli') {
+                                Toast.info('GDB CLI 会话已结束');
+                            } else if (msg.sessionKind === 'native') {
+                                Toast.info('probe-rs 原生命令已结束');
+                            } else {
+                                Toast.info(msg.action === 'flash' ? '烧录任务已结束' : '调试任务已结束');
+                            }
                             break;
                         case 'error':
-                            if (msg.action) {
+                            if (msg.action === 'flash' || msg.action === 'debug') {
                                 this.running[msg.action] = false;
-                                this.updateStatusBadge(msg.action);
                             }
+                            this.updateStatusBadge('flash');
+                            this.updateStatusBadge('debug');
+                            this.updateStatusBadge('cli');
                             this.syncControls();
-                            this.appendLog(msg.action || this.currentMode, `[error] ${msg.message}\n`);
+                            this.appendLog(logAction, `[error] ${msg.message}\n`);
                             Toast.error(msg.message);
                             break;
                     }
@@ -6651,7 +7521,30 @@
             },
 
             updateStatusBadge(action) {
-                const badge = document.getElementById(action === 'flash' ? 'flashStatusBadge' : 'debugStatusBadge');
+                const badgeIdMap = {
+                    flash: 'flashStatusBadge',
+                    debug: 'debugStatusBadge',
+                    cli: 'cliStatusBadge'
+                };
+                const badge = document.getElementById(badgeIdMap[action] || 'debugStatusBadge');
+                if (!badge) return;
+
+                if (action === 'cli') {
+                    const cliRunning = this.running.cli;
+                    const nativeRunning = this.running.native;
+                    badge.classList.toggle('running', cliRunning || nativeRunning);
+                    if (cliRunning && nativeRunning) {
+                        badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> CLI / probe-rs 运行中';
+                    } else if (cliRunning) {
+                        badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> GDB CLI 运行中';
+                    } else if (nativeRunning) {
+                        badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> probe-rs 运行中';
+                    } else {
+                        badge.innerHTML = '<i class="fas fa-circle"></i> 空闲';
+                    }
+                    return;
+                }
+
                 const running = this.running[action];
                 badge.classList.toggle('running', running);
                 badge.innerHTML = running
@@ -6660,14 +7553,24 @@
             },
 
             appendLog(action, text) {
-                const output = document.getElementById(action === 'flash' ? 'flashLogOutput' : 'debugLogOutput');
+                const outputMap = {
+                    flash: 'flashLogOutput',
+                    debug: 'debugLogOutput',
+                    cli: 'cliLogOutput'
+                };
+                const output = document.getElementById(outputMap[action] || 'debugLogOutput');
                 const nextText = output.textContent + String(text || '');
                 output.textContent = nextText.length > 200000 ? nextText.slice(-180000) : nextText;
                 output.scrollTop = output.scrollHeight;
             },
 
             clearLog(action) {
-                document.getElementById(action === 'flash' ? 'flashLogOutput' : 'debugLogOutput').textContent = '';
+                const outputMap = {
+                    flash: 'flashLogOutput',
+                    debug: 'debugLogOutput',
+                    cli: 'cliLogOutput'
+                };
+                document.getElementById(outputMap[action] || 'debugLogOutput').textContent = '';
             },
 
             async startAction(action) {
@@ -6709,8 +7612,8 @@
                 if (!this.running[action] || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
                     return;
                 }
-                this.ws.send(JSON.stringify({ type: 'stop' }));
-                this.appendLog(action, '[gui] 停止请求已发送\n');
+                this.ws.send(JSON.stringify({ type: 'stop', sessionKind: action }));
+                this.appendLog(action === 'native' ? 'cli' : action, '[gui] 停止请求已发送\n');
             }
         };
 

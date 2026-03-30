@@ -83,6 +83,7 @@ Web-based server management tools with SSH terminal access, local shell terminal
   - `pyOCD` can search its built-in target catalog
   - `probe-rs` can search the chip catalog returned by `probe-rs chip list`
   - Supports prefix matches, substring matches, and lightweight fuzzy matching while still allowing manual input
+  - Tool-specific placeholders, helper hints, detected-candidate counters, and fallback probe/catalog messages follow the current UI language automatically
 - **Admin/root Elevation Request**
   - Linux prefers `pkexec`, then falls back to `sudo + zenity/kdialog`
   - macOS uses `sudo + osascript`

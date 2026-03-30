@@ -3240,6 +3240,7 @@
                     '演示': 'Demo',
                     '波形显示': 'Waveform',
                     '波形': 'Waveform',
+                    '统计': 'Statistics',
                     '统计图': 'Statistics',
                     '全屏': 'Fullscreen',
                     '浏览器不支持 Web Serial API': 'This browser does not support the Web Serial API',
@@ -3269,12 +3270,15 @@
                     '优先从所选工具列举可用烧录器；无结果时可直接在右侧输入。': 'Available probes are listed from the selected tool first. If none are found, type one manually on the right.',
                     '烧录器标识 / 配置': 'Probe Identifier / Config',
                     '例如 cmsis-dap、st-link、UID 或 probe 选择串': 'For example: cmsis-dap, st-link, a UID, or a probe selector',
+                    '例如 cmsis-dap、st-link': 'For example: cmsis-dap or st-link',
                     '目标芯片 / 目标配置': 'Target Chip / Target Config',
                     '例如 target/stm32f4x.cfg 或 stm32f103rc': 'For example: target/stm32f4x.cfg or stm32f103rc',
+                    '例如 target/stm32f4x.cfg': 'For example: target/stm32f4x.cfg',
                     '接口配置': 'Interface Config',
                     '可选，留空时使用 interface/<烧录器>.cfg': 'Optional. Leave empty to use interface/<probe>.cfg',
                     '波特率 / 速率': 'Baud Rate / Speed',
                     '例如 4000、1000000、10m': 'For example: 4000, 1000000, or 10m',
+                    '例如 4000': 'For example: 4000',
                     '固件路径': 'Firmware Path',
                     '输入固件在当前主机上的绝对路径': 'Enter the firmware absolute path on the current host',
                     '选择文件': 'Choose File',
@@ -3403,6 +3407,8 @@
                     '主机未保存私钥，请先补充': 'No private key is saved for this host. Add one first.',
                     '主机未保存密码，请先补充': 'No password is saved for this host. Add one first.',
                     '目标地址校验失败': 'Target validation failed',
+                    '目标主机解析到内网地址，但未在内网白名单中放行': 'The target host resolved to a private network address, but it is not allowed by the private network allowlist',
+                    '目标主机解析到内网地址，但未在内网白名单中放行。请先到 设置 -> 内网白名单 放行对应网段。': 'The target host resolved to a private network address, but it is not allowed by the private network allowlist. Go to Settings -> Private Network Allowlist and allow the matching CIDR range first.',
                     '仅管理员可管理内网白名单': 'Only administrators can manage the private network allowlist',
                     '当前用户不可用': 'Current user is unavailable',
                     '请输入新密码': 'Enter a new password',
@@ -3496,13 +3502,18 @@
                     '支持从 OpenOCD 的 interface 目录中搜索并选择 .cfg。': 'Supports searching and selecting .cfg files from the OpenOCD interface directory.',
                     'OpenOCD 会按 GUI 选项追加 verify/reset/exit 指令。': 'OpenOCD appends verify/reset/exit commands according to the GUI options.',
                     '优先自动列出已连接 probe，也可手动填写 UID 或部分 UID。': 'Connected probes are listed automatically first, or you can enter a UID or partial UID manually.',
+                    '例如 cmsisdap:12345678 或部分 UID': 'For example: cmsisdap:12345678 or a partial UID',
                     '目标芯片': 'Target Chip',
+                    '例如 stm32f103rc': 'For example: stm32f103rc',
                     '请输入 pyOCD 支持的目标芯片名称。': 'Enter a pyOCD target name.',
                     '调试频率 (Hz)': 'Debug Frequency (Hz)',
+                    '例如 1000000、10m': 'For example: 1000000 or 10m',
                     'pyOCD 的写后校验沿用自身默认烧录策略。': 'pyOCD uses its default verification behavior after flashing.',
                     'Probe 选择': 'Probe Selector',
                     '优先自动列出当前 probe，也可手动填写 probe 选择串。': 'The current probe is listed automatically first, or you can enter a probe selector manually.',
+                    '例如 0483:3748 或 0483:3748:SERIAL': 'For example: 0483:3748 or 0483:3748:SERIAL',
                     '请输入 probe-rs 支持的芯片名称。': 'Enter a chip name supported by probe-rs.',
+                    '例如 STM32F103C8': 'For example: STM32F103C8',
                     '调试速率 (kHz)': 'Debug Speed (kHz)',
                     'probe-rs 的写后校验沿用当前 CLI 默认行为。': 'probe-rs uses the current CLI default verification behavior.',
                     '载入 ELF，适合在启动 GDB CLI 后绑定当前目标程序。': 'Load an ELF file, typically after starting the GDB CLI for the current target program.',
@@ -3762,7 +3773,9 @@
                     '持续 trace 指定内存位置。': 'Continuously trace the specified memory location.',
                     'Trace 地址': 'Trace address',
                     'RTT / defmt 日志 attach；需要 ELF 路径。': 'Attach RTT / defmt logging; requires an ELF path.',
+                    'pyOCD 目标': 'pyOCD targets',
                     'pyOCD 目标目录': 'pyOCD Target Catalog',
+                    'probe-rs 芯片': 'probe-rs chips',
                     'probe-rs 芯片目录': 'probe-rs Chip Catalog',
                     'OpenOCD target 配置': 'OpenOCD target config',
                     'OpenOCD interface 配置': 'OpenOCD interface config',
@@ -3823,7 +3836,39 @@
                     '请输入 VNC 主机地址': 'Enter a VNC host address',
                     'VNC 模块未加载，请刷新页面': 'The VNC module is not loaded. Refresh the page.',
                     '请输入主机地址和用户名': 'Enter both host and username',
-                    '删除': 'Delete'
+                    '删除': 'Delete',
+                    '终端': 'Terminal',
+                    '无进程数据': 'No process data',
+                    '未连接到SSH': 'Not connected to SSH',
+                    '进程信号已发送': 'Process signal sent',
+                    '操作失败': 'Operation failed',
+                    'Docker 不可用': 'Docker unavailable',
+                    '暂无运行中的容器': 'No running containers',
+                    '未检测到正在运行的容器': 'No running containers were detected',
+                    '请选择一个容器': 'Select a container',
+                    '请从左侧选择容器': 'Select a container from the left',
+                    '无限制': 'Unlimited',
+                    '容器叠加': 'containers aggregated',
+                    '总流量': 'Total traffic',
+                    '已用': 'used',
+                    '文件夹创建成功': 'Folder created successfully',
+                    '请先选择要下载的文件': 'Select files to download first',
+                    '请选择有效的文件': 'Select a valid file',
+                    '下载完成': 'Download completed',
+                    '空目录': 'Empty folder',
+                    '暂无保存的主机': 'No saved hosts yet',
+                    '加载主机列表失败': 'Failed to load host list',
+                    '密钥登录': 'Key authentication',
+                    '暂无白名单': 'No allowlist entries',
+                    '私有网段': 'Private network range',
+                    '演示模式': 'Demo mode',
+                    '串口终端 - 演示模式': 'Serial Terminal - Demo Mode',
+                    '串口终端 - 已连接': 'Serial Terminal - Connected',
+                    '固件文件': 'Firmware file',
+                    'ELF 文件': 'ELF file',
+                    'VNC 库加载失败，请刷新页面重试': 'The VNC library failed to load. Refresh the page and try again.',
+                    'VNC 服务器需要密码': 'The VNC server requires a password',
+                    '密码错误': 'Incorrect password'
                 }
             },
             PATTERNS: {
@@ -3840,11 +3885,13 @@
                     [/^下载失败: (.+)$/u, (_match, message) => `Download failed: ${I18n.auto(message)}`],
                     [/^保存失败: (.+)$/u, (_match, message) => `Save failed: ${I18n.auto(message)}`],
                     [/^更新失败: (.+)$/u, (_match, message) => `Update failed: ${I18n.auto(message)}`],
+                    [/^认证失败: (.+)$/u, (_match, message) => `Authentication failed: ${I18n.auto(message)}`],
                     [/^加载白名单失败: (.+)$/u, (_match, message) => `Failed to load allowlist: ${I18n.auto(message)}`],
                     [/^密码修改失败: (.+)$/u, (_match, message) => `Password update failed: ${I18n.auto(message)}`],
                     [/^登录失败: (.+)$/u, (_match, message) => `Sign-in failed: ${I18n.auto(message)}`],
                     [/^连接失败: (.+)$/u, (_match, message) => `Connection failed: ${I18n.auto(message)}`],
                     [/^列表错误: (.+)$/u, (_match, message) => `List error: ${I18n.auto(message)}`],
+                    [/^例如\s*(.+)$/u, (_match, example) => `For example: ${String(example || '').replace(/、/gu, ', ').replace(/\s*或\s*/gu, ' or ').trim()}`],
                     [/^正在下载: (.+)$/u, 'Downloading: $1'],
                     [/^正在打包 (\d+) 个项目\.\.\.$/u, 'Packaging $1 items...'],
                     [/^正在发送 (.+) 到 PID (\d+)\.\.\.$/u, 'Sending $1 to PID $2...'],
@@ -3858,6 +3905,12 @@
                     [/^当前固件路径：(.+)$/u, 'Current firmware path: $1'],
                     [/^当前 CLI ELF \/ 符号文件路径：(.+)$/u, 'Current CLI ELF / symbols path: $1'],
                     [/^当前未单独设置 CLI ELF，默认将沿用烧录文件路径：(.+)$/u, 'No separate CLI ELF is set. The flash file path will be used by default: $1'],
+                    [/^(.+?) 未检测到已连接 probe，已回退显示 pyOCD debug-probe 插件前缀。$/u, (_match, prefix) => `${I18n.auto(prefix)} No connected probe was detected. Fell back to showing pyOCD debug-probe plugin prefixes.`],
+                    [/^(.+?) 未检测到已连接 probe，可按 VID:PID 或 VID:PID:Serial 手动输入。$/u, (_match, prefix) => `${I18n.auto(prefix)} No connected probe was detected. You can enter VID:PID or VID:PID:Serial manually.`],
+                    [/^(.+?) 当前显示 (\d+) 个 pyOCD 插件前缀，选择后可在右侧继续补充 UID。$/u, (_match, prefix, count) => `${I18n.auto(prefix)} Showing ${count} pyOCD probe prefixes. After selecting one, you can continue entering the UID on the right.`],
+                    [/^(.+?) 当前显示 probe-rs 选择模板，可按帮助格式手动补全。$/u, (_match, prefix) => `${I18n.auto(prefix)} Showing probe-rs selector templates. Complete them manually using the help format.`],
+                    [/^(.+?) 当前检测到 (\d+) 个候选项。$/u, (_match, prefix, count) => `${I18n.auto(prefix)} ${count} candidates detected.`],
+                    [/^(.+?) 当前未检测到候选项，可直接手动输入。$/u, (_match, prefix) => `${I18n.auto(prefix)} No candidates detected right now. You can type manually.`],
                     [/^当前显示 (\d+) 个 pyOCD 插件前缀，选择后可在右侧继续补充 UID。$/u, 'Showing $1 pyOCD probe prefixes. After selecting one, you can continue entering the UID on the right.'],
                     [/^当前检测到 (\d+) 个候选项。$/u, '$1 candidates detected.'],
                     [/^正在检测 (.+) \.\.\.$/u, 'Checking $1...'],
@@ -3867,10 +3920,11 @@
                     [/^自定义: (.+)$/u, 'Custom: $1'],
                     [/^(.+) 未在 PATH 中找到，请填写手动路径$/u, '$1 was not found in PATH. Enter the path manually.'],
                     [/^未载入 (.+)：(.+)$/u, (_match, label, message) => `${I18n.auto(label)} not loaded: ${I18n.auto(message)}`],
+                    [/^(.+)尚未载入，可直接手动输入。$/u, (_match, label) => `${I18n.auto(label)} is not loaded yet. You can type it manually.`],
                     [/^正在等待 (.+)，期间仍可直接手动输入。$/u, (_match, label) => `Waiting for ${I18n.auto(label)}. You can still type it manually.`],
                     [/^输入关键字搜索 (.+)。$/u, (_match, label) => `Type keywords to search ${I18n.auto(label)}.`],
                     [/^未找到匹配项，可继续手动输入 (.+)。$/u, (_match, label) => `No match found. You can keep entering ${I18n.auto(label)} manually.`],
-                    [/^已载入 (\d+) 个(.+)，输入时支持前缀、片段和模糊搜索。$/u, (_match, count, label) => `Loaded ${count}${I18n.auto(label)}. Prefix, substring, and fuzzy search are supported when typing.`],
+                    [/^已载入 (\d+) 个(.+)，输入时支持前缀、片段和模糊搜索。$/u, (_match, count, label) => `Loaded ${count} ${I18n.auto(String(label || '').trim())}. Prefix, substring, and fuzzy search are supported when typing.`],
                     [/^已载入 (\d+) 个 target 配置，来源：(.+) (.+)；输入时支持前缀、片段和模糊搜索。$/u, (_match, count, sourceLabel, dir) => `Loaded ${count} target configs from ${I18n.auto(sourceLabel)} ${dir}. Prefix, substring, and fuzzy search are supported when typing.`],
                     [/^已载入 (\d+) 个 interface 配置，来源：(.+) (.+)；输入时支持前缀、片段和模糊搜索。$/u, (_match, count, sourceLabel, dir) => `Loaded ${count} interface configs from ${I18n.auto(sourceLabel)} ${dir}. Prefix, substring, and fuzzy search are supported when typing.`],
                     [/^删除 "(.+)"\?$/u, 'Delete "$1"?'],
@@ -3885,6 +3939,11 @@
                     [/^发送信号失败: (.+)$/u, (_match, message) => `Failed to send signal: ${I18n.auto(message)}`],
                     [/^已发送 (.+) 到 PID (\d+)$/u, 'Sent $1 to PID $2'],
                     [/^上传了 (\d+) 个文件$/u, 'Uploaded $1 files'],
+                    [/^终端 - (.+)$/u, 'Terminal - $1'],
+                    [/^Web 终端 - (.+)$/u, 'Web Terminal - $1'],
+                    [/^串口终端 - (.+)$/u, 'Serial Terminal - $1'],
+                    [/^总计 (\d+) 个，运行中 (\d+) 个$/u, '$1 total, $2 running'],
+                    [/^(\d+) 个容器叠加$/u, 'Aggregated across $1 containers'],
                     [/^(.+)格式无效$/u, (_match, field) => `Invalid ${I18n.auto(field)} format`],
                     [/^(.+)长度超过限制$/u, (_match, field) => `${I18n.auto(field)} exceeds the length limit`],
                     [/^(.+)不能为空$/u, (_match, field) => `${I18n.auto(field)} cannot be empty`],
@@ -4053,6 +4112,64 @@
                 return text;
             }
         };
+
+        window.I18n = I18n;
+
+        function buildIconTextHtml(iconClass, text) {
+            return `<i class="fas ${escapeHtml(iconClass)}"></i><span>${escapeHtml(I18n.auto(text))}</span>`;
+        }
+
+        function buildInlineIconTextHtml(iconClass, text) {
+            return `<i class="fas ${escapeHtml(iconClass)}"></i> ${escapeHtml(I18n.auto(text))}`;
+        }
+
+        function buildEmptyStateHtml(iconClass, text, className = 'empty') {
+            const icon = iconClass ? `<i class="fas ${escapeHtml(iconClass)}"></i>` : '';
+            const content = className === 'empty'
+                ? `<p>${escapeHtml(I18n.auto(text))}</p>`
+                : escapeHtml(I18n.auto(text));
+            return `<div class="${escapeHtml(className)}">${icon}${content}</div>`;
+        }
+
+        function buildTablePlaceholderHtml(text, colspan = 10) {
+            return `<tr><td colspan="${colspan}" style="text-align:center;color:var(--color-text-3);padding:20px">${escapeHtml(I18n.auto(text))}</td></tr>`;
+        }
+
+        function setI18nTextValue(element, source) {
+            if (!element) return;
+            const text = String(source ?? '');
+            const shouldResumeObserver = Boolean(I18n.observer && I18n.observing);
+            I18n.stopObserver();
+            try {
+                element.textContent = text;
+                const node = element.firstChild;
+                if (node && element.childNodes.length === 1 && node.nodeType === Node.TEXT_NODE) {
+                    node.__i18nSource = text;
+                }
+                I18n.applyTree(element, false);
+            } finally {
+                if (shouldResumeObserver) {
+                    I18n.startObserver();
+                }
+            }
+        }
+
+        function setI18nAttributeValue(element, attr, source) {
+            if (!element) return;
+            const text = String(source ?? '');
+            const shouldResumeObserver = Boolean(I18n.observer && I18n.observing);
+            I18n.stopObserver();
+            try {
+                const sourceKey = I18n.getSourceKey(attr);
+                element.dataset[sourceKey] = text;
+                element.setAttribute(attr, text);
+                I18n.applyElementAttributes(element, false, [attr]);
+            } finally {
+                if (shouldResumeObserver) {
+                    I18n.startObserver();
+                }
+            }
+        }
 
         function buildWsUrl(path) {
             const url = new URL(path, Config.WS_BASE);
@@ -4260,8 +4377,8 @@
             if (!btn) return;
             const editing = State.editingHostIndex !== null;
             btn.innerHTML = editing
-                ? '<i class="fas fa-save"></i> 更新主机'
-                : '<i class="fas fa-plus"></i> 保存主机';
+                ? `<i class="fas fa-save"></i> ${escapeHtml(I18n.auto('更新主机'))}`
+                : `<i class="fas fa-plus"></i> ${escapeHtml(I18n.auto('保存主机'))}`;
             if (cancelBtn) cancelBtn.style.display = editing ? '' : 'none';
         }
 
@@ -4344,7 +4461,7 @@
                         <div class="scheme-preview">${swatches}</div>
                         <div class="scheme-meta">
                             <div><div class="scheme-name">${escapeHtml(s.label)}</div><div class="scheme-tone">${escapeHtml(s.tone)}</div></div>
-                            ${active ? '<span class="scheme-badge">当前</span>' : ''}
+                            ${active ? `<span class="scheme-badge">${escapeHtml(I18n.auto('当前'))}</span>` : ''}
                         </div>
                     </button>`;
                 }).join('');
@@ -4365,7 +4482,7 @@
                     if (active && !badge && meta) {
                         const nextBadge = document.createElement('span');
                         nextBadge.className = 'scheme-badge';
-                        nextBadge.textContent = '当前';
+                        nextBadge.textContent = I18n.auto('当前');
                         meta.appendChild(nextBadge);
                     }
                     if (!active && badge) {
@@ -4425,7 +4542,7 @@
                     return `<button type="button" class="language-card${active ? ' active' : ''}" data-language="${escapeHtml(option.key)}" aria-pressed="${active}">
                         <div class="scheme-meta">
                             <span class="language-code">${escapeHtml(option.code)}</span>
-                            ${active ? '<span class="scheme-badge">当前</span>' : ''}
+                            ${active ? `<span class="scheme-badge">${escapeHtml(I18n.auto('当前'))}</span>` : ''}
                         </div>
                         <div>
                             <div class="scheme-name">${escapeHtml(option.label)}</div>
@@ -4678,7 +4795,7 @@
                 this.showError('');
             },
             showError(msg) {
-                document.getElementById('authError').textContent = msg || '';
+                document.getElementById('authError').textContent = msg ? I18n.auto(msg) : '';
             }
         };
 
@@ -4828,12 +4945,12 @@
                 const title = document.getElementById('termTitle');
                 if (connected) {
                     status.className = 'terminal-status connected';
-                    status.innerHTML = '<i class="fas fa-circle"></i><span>已连接</span>';
-                    title.textContent = `终端 - ${this.host}`;
+                    status.innerHTML = buildIconTextHtml('fa-circle', '已连接');
+                    title.textContent = I18n.auto(`终端 - ${this.host}`);
                 } else {
                     status.className = 'terminal-status disconnected';
-                    status.innerHTML = '<i class="fas fa-circle"></i><span>未连接</span>';
-                    title.textContent = '终端 - 未连接';
+                    status.innerHTML = buildIconTextHtml('fa-circle', '未连接');
+                    title.textContent = I18n.auto('终端 - 未连接');
                 }
             },
             // Start stats collection (called on SSH connect)
@@ -4968,7 +5085,7 @@
                 document.getElementById('topCpuUsage').textContent = '--';
                 document.getElementById('topMemUsage').textContent = '--';
                 // Clear table
-                document.getElementById('topTableBody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--color-text-3);padding:20px">连接SSH后自动获取进程信息</td></tr>';
+                document.getElementById('topTableBody').innerHTML = buildTablePlaceholderHtml('连接SSH后自动获取进程信息');
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                     this.ws.send(JSON.stringify({ type: 'stopTop' }));
                 }
@@ -5070,7 +5187,7 @@
                 document.getElementById('topRunningValue').textContent = runningProcs;
 
                 // Update summary
-                document.getElementById('topTasks').textContent = `${totalProcs} total, ${runningProcs} running`;
+                document.getElementById('topTasks').textContent = I18n.auto(`总计 ${totalProcs} 个，运行中 ${runningProcs} 个`);
 
                 // Calculate total CPU/MEM
                 const totalCpu = processes.reduce((sum, p) => sum + p.cpu, 0);
@@ -5103,7 +5220,7 @@
 
                 // Render rows
                 if (sorted.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--color-text-3);padding:20px">无进程数据</td></tr>';
+                    tbody.innerHTML = buildTablePlaceholderHtml('无进程数据');
                     return;
                 }
 
@@ -5185,9 +5302,9 @@
                 document.getElementById('dockerContainerCountValue').textContent = '--';
                 document.getElementById('dockerCpuHintValue').textContent = '--';
                 document.getElementById('dockerMemHintValue').textContent = '--';
-                document.getElementById('dockerPanelStatus').textContent = '连接 SSH 后自动获取容器信息';
+                document.getElementById('dockerPanelStatus').textContent = I18n.auto('连接 SSH 后自动获取容器信息');
                 document.getElementById('dockerContainerList').innerHTML = '';
-                document.getElementById('dockerMetricsGrid').innerHTML = '<div class="docker-panel-empty">连接 SSH 后自动获取 Docker Stats</div>';
+                document.getElementById('dockerMetricsGrid').innerHTML = buildEmptyStateHtml('', '连接 SSH 后自动获取 Docker Stats', 'docker-panel-empty');
                 document.querySelectorAll('#dockerModeSwitch .docker-mode-tag').forEach(btn => {
                     btn.classList.toggle('active', btn.dataset.mode === 'total');
                 });
@@ -5246,22 +5363,22 @@
                     btn.classList.toggle('active', btn.dataset.mode === this.dockerMode);
                 });
                 if (this.dockerAvailable === null) {
-                    status.textContent = '连接 SSH 后自动获取容器信息';
+                    status.textContent = I18n.auto('连接 SSH 后自动获取容器信息');
                     list.innerHTML = '';
-                    metrics.innerHTML = '<div class="docker-panel-empty">连接 SSH 后自动获取 Docker Stats</div>';
+                    metrics.innerHTML = buildEmptyStateHtml('', '连接 SSH 后自动获取 Docker Stats', 'docker-panel-empty');
                     return;
                 }
                 if (!this.dockerAvailable) {
                     const errMsg = this.dockerError || 'Docker 不可用';
-                    status.textContent = errMsg;
+                    status.textContent = I18n.auto(errMsg);
                     list.innerHTML = '';
-                    metrics.innerHTML = `<div class="docker-panel-empty">${escapeHtml(errMsg)}</div>`;
+                    metrics.innerHTML = buildEmptyStateHtml('', errMsg, 'docker-panel-empty');
                     return;
                 }
                 if (!this.dockerContainers.length) {
-                    status.textContent = '暂无运行中的容器';
+                    status.textContent = I18n.auto('暂无运行中的容器');
                     list.innerHTML = '';
-                    metrics.innerHTML = '<div class="docker-panel-empty">未检测到正在运行的容器</div>';
+                    metrics.innerHTML = buildEmptyStateHtml('', '未检测到正在运行的容器', 'docker-panel-empty');
                     return;
                 }
                 // Render container list (single mode)
@@ -5279,13 +5396,13 @@
                 const totals = this._dockerAggregate(this.dockerContainers);
                 const selected = isSingle ? this.dockerContainers.find(c => c.id === this.dockerSelectedId) : null;
                 if (isSingle && !selected) {
-                    status.textContent = '请选择一个容器';
-                    metrics.innerHTML = '<div class="docker-panel-empty">请从左侧选择容器</div>';
+                    status.textContent = I18n.auto('请选择一个容器');
+                    metrics.innerHTML = buildEmptyStateHtml('', '请从左侧选择容器', 'docker-panel-empty');
                     return;
                 }
                 const scope = selected || totals;
                 const badge = isSingle ? '详细' : '总计';
-                status.textContent = isSingle ? `容器: ${selected.name}` : `总计 · ${this.dockerContainers.length} 个容器`;
+                status.textContent = I18n.auto(isSingle ? `容器: ${selected.name}` : `总计 · ${this.dockerContainers.length} 个容器`);
                 // Build metric cards
                 const netTotal = scope.netIn + scope.netOut;
                 const blockTotal = scope.blockRead + scope.blockWrite;
@@ -5294,10 +5411,10 @@
                 const netPct = isSingle ? (allNetTotal > 0 ? Math.min(netTotal / allNetTotal * 100, 100) : 0) : (netTotal > 0 ? 100 : 0);
                 const blockPct = isSingle ? (allBlockTotal > 0 ? Math.min(blockTotal / allBlockTotal * 100, 100) : 0) : (blockTotal > 0 ? 100 : 0);
                 const cards = [
-                    { label: 'CPU', color: '#4b5563', pct: Math.min(scope.cpuPercent, 100), text: scope.cpuPercent.toFixed(1) + '%', sub: badge, detail: isSingle ? scope.name : `${this.dockerContainers.length} 容器叠加` },
-                    { label: 'MEM', color: '#107c10', pct: Math.min(scope.memPercent, 100), text: scope.memPercent.toFixed(1) + '%', sub: this.formatSize(scope.memUsed) + ' 已用', detail: `${this.formatSize(scope.memUsed)} / ${scope.memLimit > 0 ? this.formatSize(scope.memLimit) : '无限制'}` },
-                    { label: 'NET I/O', color: '#ff8c00', pct: netPct, text: this.formatSize(netTotal), sub: isSingle ? netPct.toFixed(1) + '% 占总量' : '总流量', detail: `IN ${this.formatSize(scope.netIn)} / OUT ${this.formatSize(scope.netOut)}` },
-                    { label: 'BLOCK I/O', color: '#d83b01', pct: blockPct, text: this.formatSize(blockTotal), sub: isSingle ? blockPct.toFixed(1) + '% 占总量' : '总流量', detail: `R ${this.formatSize(scope.blockRead)} / W ${this.formatSize(scope.blockWrite)}` }
+                    { label: 'CPU', color: '#4b5563', pct: Math.min(scope.cpuPercent, 100), text: scope.cpuPercent.toFixed(1) + '%', sub: badge, detail: isSingle ? scope.name : `${this.dockerContainers.length} ${I18n.auto('容器叠加')}` },
+                    { label: 'MEM', color: '#107c10', pct: Math.min(scope.memPercent, 100), text: scope.memPercent.toFixed(1) + '%', sub: `${this.formatSize(scope.memUsed)} ${I18n.auto('已用')}`, detail: `${this.formatSize(scope.memUsed)} / ${scope.memLimit > 0 ? this.formatSize(scope.memLimit) : I18n.auto('无限制')}` },
+                    { label: 'NET I/O', color: '#ff8c00', pct: netPct, text: this.formatSize(netTotal), sub: isSingle ? `${netPct.toFixed(1)}%` : I18n.auto('总流量'), detail: `IN ${this.formatSize(scope.netIn)} / OUT ${this.formatSize(scope.netOut)}` },
+                    { label: 'BLOCK I/O', color: '#d83b01', pct: blockPct, text: this.formatSize(blockTotal), sub: isSingle ? `${blockPct.toFixed(1)}%` : I18n.auto('总流量'), detail: `R ${this.formatSize(scope.blockRead)} / W ${this.formatSize(scope.blockWrite)}` }
                 ];
                 metrics.innerHTML = cards.map(c => this._renderRingCard(c, badge)).join('');
             },
@@ -5488,7 +5605,7 @@
             updateSelectionCount() {
                 const count = State.selectedFiles.filter(f => f.name !== '..').length;
                 const el = document.getElementById('selectedCount');
-                el.textContent = count > 0 ? `已选 ${count} 项` : '';
+                el.textContent = count > 0 ? I18n.auto(`已选 ${count} 项`) : '';
             },
             async list(path) {
                 await this.navigate(path);
@@ -5572,11 +5689,11 @@
                 const connBtn = document.getElementById('sftpConnectBtn');
                 if (connected) {
                     el.classList.remove('disconnected'); el.classList.add('connected');
-                    txt.textContent = `已连接到 ${host}`;
+                    txt.textContent = I18n.auto(`已连接到 ${host}`);
                     disconnBtn.style.display = 'inline-flex'; connBtn.disabled = true;
                 } else {
                     el.classList.remove('connected'); el.classList.add('disconnected');
-                    txt.textContent = '未连接';
+                    txt.textContent = I18n.auto('未连接');
                     disconnBtn.style.display = 'none'; connBtn.disabled = false;
                 }
             },
@@ -5657,8 +5774,8 @@
                 const el = document.getElementById('fileList');
                 if (!files || files.length === 0) {
                     el.innerHTML = State.sftpConnected
-                        ? '<div class="empty"><i class="fas fa-folder-open"></i><p>空目录</p></div>'
-                        : '<div class="empty"><i class="fas fa-plug"></i><p>请先连接服务器</p></div>';
+                        ? buildEmptyStateHtml('fa-folder-open', '空目录')
+                        : buildEmptyStateHtml('fa-plug', '请先连接服务器');
                     return;
                 }
                 const items = State.currentPath !== '/' ? [{ name: '..', type: 'folder', size: '', modified: '' }, ...files] : files;
@@ -5829,12 +5946,12 @@
             render() {
                 const el = document.getElementById('hostsGrid');
                 if (!Array.isArray(State.hosts) || State.hosts.length === 0) {
-                    el.innerHTML = '<div class="empty"><i class="fas fa-server"></i><p>暂无保存的主机</p></div>';
+                    el.innerHTML = buildEmptyStateHtml('fa-server', '暂无保存的主机');
                     return;
                 }
                 el.innerHTML = State.hosts.map((h, i) => {
                     const authType = normalizeAuthType(h.authType, h.privateKey || '');
-                    const authLabel = authType === AUTH_TYPE_KEY ? '密钥登录' : '密码登录';
+                    const authLabel = I18n.auto(authType === AUTH_TYPE_KEY ? '密钥登录' : '密码登录');
                     const hostText = escapeHtml(h.host || '');
                     const userText = escapeHtml(h.user || '');
                     const portText = escapeHtml(h.port || 22);
@@ -5945,7 +6062,7 @@
                 const el = document.getElementById('privateNetList');
                 if (!el) return;
                 if (!this.networks.length) {
-                    el.innerHTML = '<div class="empty"><i class="fas fa-network-wired"></i><p>暂无白名单</p></div>';
+                    el.innerHTML = buildEmptyStateHtml('fa-network-wired', '暂无白名单');
                     return;
                 }
                 el.innerHTML = this.networks.map((net, i) => `
@@ -5953,7 +6070,7 @@
                         <button class="host-delete" data-index="${i}"><i class="fas fa-times"></i></button>
                         <div class="host-card-content">
                             <div class="host-info"><i class="fas fa-network-wired"></i><span class="host-ip">${net}</span></div>
-                            <div class="host-details">私有网段</div>
+                            <div class="host-details">${escapeHtml(I18n.auto('私有网段'))}</div>
                         </div>
                     </div>
                 `).join('');
@@ -7257,21 +7374,21 @@
                 if (connected) {
                     status.classList.remove('disconnected');
                     status.classList.add('connected');
-                    text.textContent = isDemo ? '演示模式' : '已连接';
+                    text.textContent = I18n.auto(isDemo ? '演示模式' : '已连接');
                     disconnBtn.style.display = 'inline-flex';
                     connBtn.disabled = true;
                     demoBtn.disabled = true;
                     sendBtn.disabled = isDemo; // Disable send in demo mode
-                    title.textContent = isDemo ? '串口终端 - 演示模式' : '串口终端 - 已连接';
+                    title.textContent = I18n.auto(isDemo ? '串口终端 - 演示模式' : '串口终端 - 已连接');
                 } else {
                     status.classList.remove('connected');
                     status.classList.add('disconnected');
-                    text.textContent = '未连接';
+                    text.textContent = I18n.auto('未连接');
                     disconnBtn.style.display = 'none';
                     connBtn.disabled = false;
                     demoBtn.disabled = false;
                     sendBtn.disabled = true;
-                    title.textContent = '串口终端 - 未连接';
+                    title.textContent = I18n.auto('串口终端 - 未连接');
                 }
             }
         };
@@ -8220,13 +8337,13 @@
                 if (!field) {
                     group.classList.add('flashdebug-hidden');
                     input.value = '';
-                    input.placeholder = '';
+                    setI18nAttributeValue(input, 'placeholder', '');
                     return;
                 }
 
                 group.classList.remove('flashdebug-hidden');
-                label.textContent = field.label;
-                input.placeholder = field.placeholder || '';
+                setI18nTextValue(label, field.label || '');
+                setI18nAttributeValue(input, 'placeholder', field.placeholder || '');
             },
 
             updateCliCommandForm() {
@@ -8238,7 +8355,7 @@
                 this.setDynamicField('cliCommandArg2Label', 'cliCommandArg2', fields[1] || null);
                 this.setDynamicField('cliCommandArg3Label', 'cliCommandArg3', fields[2] || null);
                 this.setDynamicField('cliCommandArg4Label', 'cliCommandArg4', fields[3] || null);
-                document.getElementById('cliCommandHint').textContent = spec.hint || '';
+                setI18nTextValue(document.getElementById('cliCommandHint'), spec.hint || '');
             },
 
             updateProbeRsCommandForm() {
@@ -8250,7 +8367,7 @@
                 this.setDynamicField('probeRsArg2Label', 'probeRsArg2', fields[1] || null);
                 this.setDynamicField('probeRsArg3Label', 'probeRsArg3', fields[2] || null);
                 this.setDynamicField('probeRsArg4Label', 'probeRsArg4', fields[3] || null);
-                document.getElementById('probeRsCommandHint').textContent = spec.hint || '';
+                setI18nTextValue(document.getElementById('probeRsCommandHint'), spec.hint || '');
             },
 
             syncCliToolPanels() {
@@ -8478,21 +8595,21 @@
             applyToolPreset() {
                 const preset = this.presets[this.currentTool] || this.presets.openocd;
 
-                document.getElementById('flashProbeLabel').textContent = preset.probeLabel;
-                document.getElementById('debugProbeLabel').textContent = preset.probeLabel;
-                document.getElementById('flashTargetLabel').textContent = preset.targetLabel;
-                document.getElementById('debugTargetLabel').textContent = preset.targetLabel;
-                document.getElementById('flashSpeedLabel').textContent = preset.speedLabel;
-                document.getElementById('debugSpeedLabel').textContent = preset.speedLabel;
-                document.getElementById('debugPortLabel').textContent = preset.debugPortLabel;
-                document.getElementById('flashProbeInput').placeholder = preset.probePlaceholder || '';
-                document.getElementById('debugProbeInput').placeholder = preset.probePlaceholder || '';
-                document.getElementById('flashTargetInput').placeholder = preset.targetPlaceholder;
-                document.getElementById('debugTargetInput').placeholder = preset.targetPlaceholder;
-                document.getElementById('flashSpeedInput').placeholder = preset.speedPlaceholder;
-                document.getElementById('debugSpeedInput').placeholder = preset.speedPlaceholder;
-                document.getElementById('flashInterfaceConfigInput').placeholder = preset.interfacePlaceholder || '';
-                document.getElementById('debugInterfaceConfigInput').placeholder = preset.interfacePlaceholder || '';
+                setI18nTextValue(document.getElementById('flashProbeLabel'), preset.probeLabel);
+                setI18nTextValue(document.getElementById('debugProbeLabel'), preset.probeLabel);
+                setI18nTextValue(document.getElementById('flashTargetLabel'), preset.targetLabel);
+                setI18nTextValue(document.getElementById('debugTargetLabel'), preset.targetLabel);
+                setI18nTextValue(document.getElementById('flashSpeedLabel'), preset.speedLabel);
+                setI18nTextValue(document.getElementById('debugSpeedLabel'), preset.speedLabel);
+                setI18nTextValue(document.getElementById('debugPortLabel'), preset.debugPortLabel);
+                setI18nAttributeValue(document.getElementById('flashProbeInput'), 'placeholder', preset.probePlaceholder || '');
+                setI18nAttributeValue(document.getElementById('debugProbeInput'), 'placeholder', preset.probePlaceholder || '');
+                setI18nAttributeValue(document.getElementById('flashTargetInput'), 'placeholder', preset.targetPlaceholder || '');
+                setI18nAttributeValue(document.getElementById('debugTargetInput'), 'placeholder', preset.targetPlaceholder || '');
+                setI18nAttributeValue(document.getElementById('flashSpeedInput'), 'placeholder', preset.speedPlaceholder || '');
+                setI18nAttributeValue(document.getElementById('debugSpeedInput'), 'placeholder', preset.speedPlaceholder || '');
+                setI18nAttributeValue(document.getElementById('flashInterfaceConfigInput'), 'placeholder', preset.interfacePlaceholder || '');
+                setI18nAttributeValue(document.getElementById('debugInterfaceConfigInput'), 'placeholder', preset.interfacePlaceholder || '');
 
                 document.getElementById('flashInterfaceGroup').classList.toggle('flashdebug-hidden', !preset.showInterface);
                 document.getElementById('debugInterfaceGroup').classList.toggle('flashdebug-hidden', !preset.showInterface);
@@ -8529,9 +8646,9 @@
                     listExtra = ' 当前未检测到候选项，可直接手动输入。';
                 }
 
-                document.getElementById('flashProbeHint').textContent = `${I18n.auto(preset.probeHint)}${I18n.auto(listExtra)}`;
-                document.getElementById('debugProbeHint').textContent = `${I18n.auto(preset.probeHint)}${I18n.auto(listExtra)}`;
-                document.getElementById('flashVerifyHint').textContent = I18n.auto(preset.verifyHint);
+                setI18nTextValue(document.getElementById('flashProbeHint'), `${preset.probeHint}${listExtra}`);
+                setI18nTextValue(document.getElementById('debugProbeHint'), `${preset.probeHint}${listExtra}`);
+                setI18nTextValue(document.getElementById('flashVerifyHint'), preset.verifyHint);
                 this.syncConfigHints();
                 this.syncElevationUi();
             },
@@ -8563,7 +8680,7 @@
                     }
 
                     checkbox.disabled = locked || busy || !supported;
-                    hint.textContent = note || '当前平台暂未检测到可用的管理员/root 提权方式。';
+                    setI18nTextValue(hint, note || '当前平台暂未检测到可用的管理员/root 提权方式。');
                 });
             },
 
@@ -8614,10 +8731,10 @@
                     }
                 }
 
-                document.getElementById('flashTargetConfigHint').textContent = I18n.auto(targetHint);
-                document.getElementById('debugTargetConfigHint').textContent = I18n.auto(targetHint);
-                document.getElementById('flashInterfaceConfigHint').textContent = I18n.auto(interfaceHint);
-                document.getElementById('debugInterfaceConfigHint').textContent = I18n.auto(interfaceHint);
+                setI18nTextValue(document.getElementById('flashTargetConfigHint'), targetHint);
+                setI18nTextValue(document.getElementById('debugTargetConfigHint'), targetHint);
+                setI18nTextValue(document.getElementById('flashInterfaceConfigHint'), interfaceHint);
+                setI18nTextValue(document.getElementById('debugInterfaceConfigHint'), interfaceHint);
             },
 
             updateManualPathVisibility() {
@@ -8654,7 +8771,7 @@
                 };
                 badge.className = `flashdebug-path-badge ${state}`;
                 badge.innerHTML = `<i class="fas ${iconMap[state] || 'fa-magnifying-glass'}"></i><span></span>`;
-                badge.querySelector('span').textContent = text;
+                setI18nTextValue(badge.querySelector('span'), text);
             },
 
             populateProgrammers(programmers = []) {
@@ -8667,7 +8784,7 @@
                     select.innerHTML = '';
                     const baseOption = document.createElement('option');
                     baseOption.value = '';
-                    baseOption.textContent = placeholder;
+                    setI18nTextValue(baseOption, placeholder);
                     select.appendChild(baseOption);
 
                     programmers.forEach((item) => {
@@ -8772,19 +8889,19 @@
                 const pathValue = document.getElementById('flashFirmwarePath').value.trim();
                 if (meta && meta.uploading) {
                     const sizeText = this.formatUploadSize(meta.size);
-                    hint.textContent = `正在上传 ${meta.originalName || '固件文件'} (${sizeText})...`;
+                    setI18nTextValue(hint, `正在上传 ${meta.originalName || '固件文件'} (${sizeText})...`);
                     return;
                 }
                 if (meta && pathValue) {
                     const sizeText = this.formatUploadSize(meta.size);
-                    hint.textContent = `已上传 ${meta.originalName || '固件文件'} (${sizeText})，当前路径：${pathValue}`;
+                    setI18nTextValue(hint, `已上传 ${meta.originalName || '固件文件'} (${sizeText})，当前路径：${pathValue}`);
                     return;
                 }
                 if (pathValue) {
-                    hint.textContent = `当前固件路径：${pathValue}`;
+                    setI18nTextValue(hint, `当前固件路径：${pathValue}`);
                     return;
                 }
-                hint.textContent = '选择本地文件后会上传到当前 Entrance 主机的临时目录，并自动回填路径。';
+                setI18nTextValue(hint, '选择本地文件后会上传到当前 Entrance 主机的临时目录，并自动回填路径。');
             },
 
             syncCliElfHint(meta = null) {
@@ -8794,23 +8911,23 @@
 
                 if (meta && meta.uploading) {
                     const sizeText = this.formatUploadSize(meta.size);
-                    hint.textContent = `正在上传 ${meta.originalName || 'ELF 文件'} (${sizeText})...`;
+                    setI18nTextValue(hint, `正在上传 ${meta.originalName || 'ELF 文件'} (${sizeText})...`);
                     return;
                 }
                 if (meta && cliPath) {
                     const sizeText = this.formatUploadSize(meta.size);
-                    hint.textContent = `已上传 ${meta.originalName || 'ELF 文件'} (${sizeText})，当前路径：${cliPath}`;
+                    setI18nTextValue(hint, `已上传 ${meta.originalName || 'ELF 文件'} (${sizeText})，当前路径：${cliPath}`);
                     return;
                 }
                 if (cliPath) {
-                    hint.textContent = `当前 CLI ELF / 符号文件路径：${cliPath}`;
+                    setI18nTextValue(hint, `当前 CLI ELF / 符号文件路径：${cliPath}`);
                     return;
                 }
                 if (flashPath) {
-                    hint.textContent = `当前未单独设置 CLI ELF，默认将沿用烧录文件路径：${flashPath}`;
+                    setI18nTextValue(hint, `当前未单独设置 CLI ELF，默认将沿用烧录文件路径：${flashPath}`);
                     return;
                 }
-                hint.textContent = '若烧录任务已选择文件，CLI ELF 默认会优先沿用该路径；也可在这里单独上传 ELF / 符号文件。';
+                setI18nTextValue(hint, '若烧录任务已选择文件，CLI ELF 默认会优先沿用该路径；也可在这里单独上传 ELF / 符号文件。');
             },
 
             async uploadFileToPathInput(file, config = {}) {
@@ -8822,7 +8939,7 @@
                 if (!pathInput) return;
 
                 try {
-                    pathInput.placeholder = '正在上传文件...';
+                    setI18nAttributeValue(pathInput, 'placeholder', '正在上传文件...');
                     if (typeof config.onPending === 'function') {
                         config.onPending({
                             originalName: file.name,
@@ -8851,7 +8968,7 @@
                     }
                     Toast.error(err.message);
                 } finally {
-                    pathInput.placeholder = config.placeholder || '';
+                    setI18nAttributeValue(pathInput, 'placeholder', config.placeholder || '');
                 }
             },
 
@@ -9201,13 +9318,13 @@
                     const nativeRunning = this.running.native;
                     badge.classList.toggle('running', cliRunning || nativeRunning);
                     if (cliRunning && nativeRunning) {
-                        badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> CLI / probe-rs 运行中';
+                        badge.innerHTML = buildInlineIconTextHtml('fa-circle-notch fa-spin', 'CLI / probe-rs 运行中');
                     } else if (cliRunning) {
-                        badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> GDB CLI 运行中';
+                        badge.innerHTML = buildInlineIconTextHtml('fa-circle-notch fa-spin', 'GDB CLI 运行中');
                     } else if (nativeRunning) {
-                        badge.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> probe-rs 运行中';
+                        badge.innerHTML = buildInlineIconTextHtml('fa-circle-notch fa-spin', 'probe-rs 运行中');
                     } else {
-                        badge.innerHTML = '<i class="fas fa-circle"></i> 空闲';
+                        badge.innerHTML = buildInlineIconTextHtml('fa-circle', '空闲');
                     }
                     return;
                 }
@@ -9215,8 +9332,8 @@
                 const running = this.running[action];
                 badge.classList.toggle('running', running);
                 badge.innerHTML = running
-                    ? '<i class="fas fa-circle-notch fa-spin"></i> 运行中'
-                    : '<i class="fas fa-circle"></i> 空闲';
+                    ? buildInlineIconTextHtml('fa-circle-notch fa-spin', '运行中')
+                    : buildInlineIconTextHtml('fa-circle', '空闲');
             },
 
             appendLog(action, text) {
@@ -9346,7 +9463,7 @@
                 } else {
                     const option = document.createElement('option');
                     option.value = '';
-                    option.textContent = '当前平台无可选 Shell';
+                    option.textContent = I18n.auto('当前平台无可选 Shell');
                     select.appendChild(option);
                     select.value = '';
                     select.disabled = true;
@@ -9423,7 +9540,7 @@
                         document.getElementById('shellNotAvailable').style.display = 'block';
                         document.getElementById('shellStartBtn').disabled = true;
                         document.getElementById('shellNotAvailableReason').innerHTML =
-                            `当前服务器平台暂不支持终端功能<br><small style="color:var(--color-text-3)">当前服务器: ${this.platform}</small>`;
+                            `${escapeHtml(I18n.auto('当前服务器平台暂不支持终端功能'))}<br><small style="color:var(--color-text-3)">${escapeHtml(I18n.auto(`当前服务器: ${this.platform}`))}</small>`;
                     }
                 } catch (e) {
                     console.error('[LocalShell] 检查状态失败:', e);
@@ -9431,7 +9548,7 @@
                     this.configureTransportUi();
                     document.getElementById('shellNotAvailable').style.display = 'block';
                     document.getElementById('shellStartBtn').disabled = true;
-                    document.getElementById('shellNotAvailableReason').textContent = '无法检查终端服务状态';
+                    document.getElementById('shellNotAvailableReason').textContent = I18n.auto('无法检查终端服务状态');
                 }
 
                 // 初始化终端
@@ -9714,17 +9831,17 @@
                 if (running) {
                     status.classList.remove('disconnected');
                     status.classList.add('connected');
-                    text.textContent = activeText;
+                    text.textContent = I18n.auto(activeText);
                     startBtn.style.display = 'none';
                     stopBtn.style.display = 'inline-flex';
-                    title.textContent = `Web 终端 - ${shell || this.shellInfo}`;
+                    title.textContent = I18n.auto(`Web 终端 - ${shell || this.shellInfo}`);
                 } else {
                     status.classList.remove('connected');
                     status.classList.add('disconnected');
-                    text.textContent = idleText;
+                    text.textContent = I18n.auto(idleText);
                     startBtn.style.display = 'inline-flex';
                     stopBtn.style.display = 'none';
-                    title.textContent = idleTitle;
+                    title.textContent = I18n.auto(idleTitle);
                 }
             }
         };
@@ -9760,7 +9877,7 @@
                             Toast.error(formatConnectionError('VNC', msg));
                         },
                         onDesktopName: (name) => {
-                            document.getElementById('vncStatusText').textContent = `已连接: ${name}`;
+                            document.getElementById('vncStatusText').textContent = I18n.auto(`已连接: ${name}`);
                         }
                     });
                     this.initialized = true;
@@ -9834,13 +9951,13 @@
                 if (connected) {
                     status.classList.remove('disconnected');
                     status.classList.add('connected');
-                    text.textContent = `已连接到 ${host}`;
+                    text.textContent = I18n.auto(`已连接到 ${host}`);
                     disconnBtn.style.display = 'inline-flex';
                     connBtn.disabled = true;
                 } else {
                     status.classList.remove('connected');
                     status.classList.add('disconnected');
-                    text.textContent = '未连接';
+                    text.textContent = I18n.auto('未连接');
                     disconnBtn.style.display = 'none';
                     connBtn.disabled = false;
                 }

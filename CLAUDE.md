@@ -79,6 +79,7 @@ PORT=4000 docker compose up -d --build
   - OpenOCD target configs and interface configs
   - pyOCD target names from `pyocd list --targets --no-header`
   - probe-rs chip names from `probe-rs chip list`
+  - Flash & Debug placeholders, helper hints, candidate counters, and fallback probe/catalog notices also run through the shared path and should follow the active UI language
 
 ### Backend Architecture
 - Express.js HTTP/REST API server
@@ -162,6 +163,7 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
   - macOS: `sudo` with `osascript`
   - Windows: `gsudo` or `sudo`
 - Flash/debug target fields use shared local-search autocomplete. OpenOCD searches discovered config catalogs, pyOCD searches the target catalog returned by `pyocd list --targets --no-header`, and probe-rs searches the chip catalog returned by `probe-rs chip list`.
+- Flash/debug helper copy is part of the same shared frontend path. When changing placeholders, helper hints, or fallback enumeration/catalog messages, keep Chinese and English behavior aligned across OpenOCD, pyOCD, and probe-rs.
 - The Settings view allows users to change their own password via `PUT /api/users/:username/password` (Argon2id hashed). Admins also get a separate private-network allowlist card below the password card. When `ENTRANCE_DESKTOP_NOLOGIN=1`, the password form is hidden and a notice is shown instead.
 - Color schemes are stored in `localStorage` (`colorScheme` key) and applied via the `data-color-scheme` attribute on `<html>`. Available schemes: default, sakura, ocean, forest, twilight, amber.
 - UI language is stored in `localStorage` (`language` key). The app defaults to English and currently supports Simplified Chinese and English.

@@ -80,6 +80,7 @@
   - `pyOCD` 支持搜索内置 target 目录
   - `probe-rs` 支持搜索 `probe-rs chip list` 返回的芯片目录
   - 支持前缀匹配、片段匹配与简单模糊匹配，仍允许手动自由输入
+  - 各工具的 placeholder、帮助提示、候选数量提示，以及 probe/目录回退说明会随当前界面语言自动切换
 - **管理员/root 权限请求** - 可在启动烧录或调试前请求系统级提权
   - Linux 优先使用 `pkexec`，否则回退到 `sudo + zenity/kdialog`
   - macOS 使用 `sudo + osascript`

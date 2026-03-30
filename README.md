@@ -110,7 +110,7 @@ Web-based server management tools with SSH terminal access, local shell terminal
   - Twilight (soft dusk)
   - Amber (warm sunset)
 - **UI Internationalization**
-  - Simplified Chinese by default, with instant switching between Chinese and English
+  - English by default, with instant switching between Chinese and English
   - A dedicated language card is shown below the color scheme card in Settings
   - Language choice is persisted in browser local storage
 - Acrylic effects
@@ -120,8 +120,9 @@ Web-based server management tools with SSH terminal access, local shell terminal
 ### Settings
 - **Change Password** - users can change their own login password in Settings (Argon2id hashed)
 - When `ENTRANCE_DESKTOP_NOLOGIN=1`, password changes are disabled and a notice is shown
+- **Private Network Allowlist** - administrators can open a dedicated card below the password card in Settings to manage private CIDR ranges for SSH, SFTP, and VNC
 - **Color Scheme Switching** - choose a Material You style accent scheme in Settings, saved automatically
-- **Language Switching** - switch the UI language from a dedicated card below the color scheme card; default is Simplified Chinese, currently supports Chinese and English
+- **Language Switching** - switch the UI language from a dedicated card below the color scheme card; default is English, currently supports Chinese and English
 
 ## Quick Start
 

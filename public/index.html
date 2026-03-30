@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light" data-color-scheme="default">
+<html lang="en" data-theme="light" data-color-scheme="default">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1419,10 +1419,6 @@
             background: var(--color-accent-soft); color: var(--color-text-2); line-height: 1.5;
         }
         .settings-note i { color: var(--color-accent); }
-        .settings-divider {
-            margin: 22px 0 18px;
-            border-top: 1px solid var(--color-border);
-        }
         .settings-link-panel {
             width: 100%;
             border: 1px solid var(--color-border);
@@ -2903,30 +2899,32 @@
                 <div class="header"><h2><i class="fas fa-gear"></i> 设置</h2></div>
                 <div class="content">
                     <div class="settings-layout">
-                        <section class="settings-card">
-                            <h3><i class="fas fa-key"></i> 修改密码</h3>
-                            <p class="settings-desc">当前账户：<strong id="settingsCurrentUser">--</strong></p>
-                            <div class="settings-note" id="settingsNologinNotice" style="display:none">
-                                <i class="fas fa-ban"></i>
-                                <span>桌面应用不允许修改密码</span>
-                            </div>
-                            <div id="settingsPasswordForm">
-                                <div class="settings-password-grid">
-                                    <div class="form-group">
-                                        <label>新密码</label>
-                                        <input type="password" class="form-input" id="settingsNewPassword" placeholder="输入新密码">
+                        <div class="settings-stack">
+                            <section class="settings-card">
+                                <h3><i class="fas fa-key"></i> 修改密码</h3>
+                                <p class="settings-desc">当前账户：<strong id="settingsCurrentUser">--</strong></p>
+                                <div class="settings-note" id="settingsNologinNotice" style="display:none">
+                                    <i class="fas fa-ban"></i>
+                                    <span>桌面应用不允许修改密码</span>
+                                </div>
+                                <div id="settingsPasswordForm">
+                                    <div class="settings-password-grid">
+                                        <div class="form-group">
+                                            <label>新密码</label>
+                                            <input type="password" class="form-input" id="settingsNewPassword" placeholder="输入新密码">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>确认密码</label>
+                                            <input type="password" class="form-input" id="settingsConfirmPassword" placeholder="再次输入新密码">
+                                        </div>
                                     </div>
-                                    <div class="form-group">
-                                        <label>确认密码</label>
-                                        <input type="password" class="form-input" id="settingsConfirmPassword" placeholder="再次输入新密码">
+                                    <div class="settings-actions">
+                                        <button class="btn" id="settingsChangePasswordBtn"><i class="fas fa-key"></i> 修改密码</button>
                                     </div>
                                 </div>
-                                <div class="settings-actions">
-                                    <button class="btn" id="settingsChangePasswordBtn"><i class="fas fa-key"></i> 修改密码</button>
-                                </div>
-                            </div>
-                            <div id="settingsPrivateNetworkSection" style="display:none">
-                                <div class="settings-divider"></div>
+                            </section>
+                            <section class="settings-card" id="settingsPrivateNetworkSection" style="display:none">
+                                <h3><i class="fas fa-shield-halved"></i> 内网白名单</h3>
                                 <button type="button" class="settings-link-panel" id="settingsOpenPrivateNetworksBtn">
                                     <span class="settings-link-copy">
                                         <span class="settings-link-title"><i class="fas fa-shield-halved"></i> 内网白名单</span>
@@ -2934,8 +2932,8 @@
                                     </span>
                                     <span class="settings-link-action">进入管理 <i class="fas fa-arrow-right"></i></span>
                                 </button>
-                            </div>
-                        </section>
+                            </section>
+                        </div>
                         <div class="settings-stack">
                             <section class="settings-card">
                                 <h3><i class="fas fa-palette"></i> 配色方案</h3>
@@ -2944,7 +2942,7 @@
                             </section>
                             <section class="settings-card">
                                 <h3><i class="fas fa-language"></i> 语言</h3>
-                                <p class="settings-desc">选择界面语言，默认简体中文</p>
+                                <p class="settings-desc">选择界面语言，默认英文</p>
                                 <div class="language-grid" id="languageGrid"></div>
                             </section>
                         </div>
@@ -3092,7 +3090,7 @@
             isNologin: false,
             username: '',
             token: '',
-            language: 'zh',
+            language: 'en',
             appVersion: '0.1.9-beta',
             projectHomepage: 'https://github.com/fcanlnony/Entrance',
             desktopVersion: '',
@@ -3118,7 +3116,7 @@
             setTheme(t) { localStorage.setItem('theme', t); },
             getColorScheme() { return localStorage.getItem('colorScheme') || 'default'; },
             setColorScheme(s) { localStorage.setItem('colorScheme', s); },
-            getLanguage() { return localStorage.getItem('language') || 'zh'; },
+            getLanguage() { return localStorage.getItem('language') || 'en'; },
             setLanguage(language) { localStorage.setItem('language', language); },
             getToken() { return localStorage.getItem('authToken') || ''; },
             setToken(t) { localStorage.setItem('authToken', t); },
@@ -3357,7 +3355,7 @@
                     '配色方案': 'Color Scheme',
                     '选择 Material You Design 风格的强调色方案': 'Choose a Material You inspired accent color scheme',
                     '语言': 'Language',
-                    '选择界面语言，默认简体中文': 'Choose the interface language. Simplified Chinese is the default.',
+                    '选择界面语言，默认英文': 'Choose the interface language. English is the default.',
                     '新建文件夹': 'New Folder',
                     '文件夹名称': 'Folder name',
                     '新文件夹': 'New folder',
@@ -3397,6 +3395,7 @@
                     '当前': 'Current',
                     '简体中文': 'Simplified Chinese',
                     '默认界面语言': 'Default UI language',
+                    '简体中文界面': 'Simplified Chinese interface',
                     '英文界面翻译': 'Translate the interface to English',
                     '密码登录需要提供密码': 'Password authentication requires a password',
                     '密钥登录需要提供私钥': 'Key authentication requires a private key',
@@ -3740,7 +3739,7 @@
                 ]
             },
             init() {
-                State.language = Storage.getLanguage() === 'en' ? 'en' : 'zh';
+                State.language = Storage.getLanguage() === 'zh' ? 'zh' : 'en';
                 window.confirm = (message) => this.nativeConfirm(this.auto(message));
                 window.alert = (message) => this.nativeAlert(this.auto(message));
                 if (!this.observer) {
@@ -4223,8 +4222,8 @@
 
         const Settings = {
             LANGUAGE_OPTIONS: [
-                { key: 'zh', code: 'ZH', label: '简体中文', tone: '默认界面语言' },
-                { key: 'en', code: 'EN', label: 'English', tone: '英文界面翻译' }
+                { key: 'en', code: 'EN', label: 'English', tone: '默认界面语言' },
+                { key: 'zh', code: 'ZH', label: '简体中文', tone: '简体中文界面' }
             ],
             init() {
                 document.getElementById('settingsChangePasswordBtn').addEventListener('click', () => this.changePassword());

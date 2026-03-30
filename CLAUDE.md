@@ -73,7 +73,7 @@ PORT=4000 docker compose up -d --build
 - Single-file HTML app with no build step
 - Modular JavaScript objects: `State`, `Storage`, `Theme`, `Settings`, `I18n`, `Toast`, `Terminal_`, `FlashDebug`, `SFTP`, `Hosts`, `UI`
 - CSS variables for theme switching and Material You color scheme support (`data-color-scheme` attribute)
-- UI i18n support with Simplified Chinese as the default language and English as the secondary option
+- UI i18n support with English as the default language and Simplified Chinese as the secondary option
 - Microsoft Fluent Design style
 - `FlashDebug` now uses a shared autocomplete pipeline for tool-specific target inputs:
   - OpenOCD target configs and interface configs
@@ -101,7 +101,7 @@ PORT=4000 docker compose up -d --build
 8. **Flash Debug Service** - Admin-only local flashing/debugging WebSocket + REST endpoints, tool discovery, uploads, and privilege-elevation wrapping
    - Includes shared target autocomplete catalogs for OpenOCD / pyOCD / probe-rs
 9. **Docker Stats** - Docker container resource monitoring via `docker stats --no-stream`
-10. **Settings** - In-app settings view for password change (disabled in `ENTRANCE_DESKTOP_NOLOGIN` mode), Material You color scheme selection (default, sakura, ocean, forest, twilight, amber), and a separate language selector card below the color scheme card (default Simplified Chinese, supports Chinese/English)
+10. **Settings** - In-app settings view for password change (disabled in `ENTRANCE_DESKTOP_NOLOGIN` mode), an admin-only private-network allowlist card below the password card, Material You color scheme selection (default, sakura, ocean, forest, twilight, amber), and a separate language selector card below the color scheme card (default English; supports Chinese/English)
 
 ### SSH Monitoring Panels
 The SSH view includes three collapsible monitoring panels below the terminal:
@@ -162,6 +162,6 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
   - macOS: `sudo` with `osascript`
   - Windows: `gsudo` or `sudo`
 - Flash/debug target fields use shared local-search autocomplete. OpenOCD searches discovered config catalogs, pyOCD searches the target catalog returned by `pyocd list --targets --no-header`, and probe-rs searches the chip catalog returned by `probe-rs chip list`.
-- The Settings view allows users to change their own password via `PUT /api/users/:username/password` (Argon2id hashed). When `ENTRANCE_DESKTOP_NOLOGIN=1`, the password form is hidden and a notice is shown instead.
+- The Settings view allows users to change their own password via `PUT /api/users/:username/password` (Argon2id hashed). Admins also get a separate private-network allowlist card below the password card. When `ENTRANCE_DESKTOP_NOLOGIN=1`, the password form is hidden and a notice is shown instead.
 - Color schemes are stored in `localStorage` (`colorScheme` key) and applied via the `data-color-scheme` attribute on `<html>`. Available schemes: default, sakura, ocean, forest, twilight, amber.
-- UI language is stored in `localStorage` (`language` key). The app defaults to Simplified Chinese and currently supports Simplified Chinese and English.
+- UI language is stored in `localStorage` (`language` key). The app defaults to English and currently supports Simplified Chinese and English.

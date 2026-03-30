@@ -38,7 +38,7 @@ PORT=4000 docker compose up -d --build
 - `AUTH_SECRET` (required) - Auth token signing key; must decode to at least 32 bytes.
 - `SSH_PASSWORD_KEY` (optional) - 32-byte AES key for stored SSH credentials and private-network allowlists; if omitted, the server writes a generated key to `.ssh_password_key` under `ENTRANCE_DATA_DIR`.
 - `PORT` - HTTP port, defaults to `3000`; can also be overridden by the `--port` / `-p` startup flag.
-- `ENTRANCE_DATA_DIR` - Runtime data directory for `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, and `.ssh_password_key`.
+- `ENTRANCE_DATA_DIR` - Runtime data directory for `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, and `.ssh_password_key`. Do not upload or commit this directory, `.data/`, or any other user/runtime data directories.
 - `AUTH_TOKEN_TTL` - Bearer token lifetime in seconds, defaults to `43200`.
 - `LOGIN_WINDOW_MS` / `LOGIN_MAX_ATTEMPTS` - Login rate-limit window and failure threshold.
 - `STRICT_HOST_KEY_CHECKING` - When `true`, reject unknown SSH host keys instead of learning them.
@@ -157,6 +157,7 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
 - If `SSH_PASSWORD_KEY` changes, existing encrypted secrets become unreadable until the old key is restored or the values are re-entered.
 - SFTP sessions are stored in memory (Map).
 - User data is isolated per user in separate JSON files under `ENTRANCE_DATA_DIR`.
+- Never upload or commit `.data/`, `ENTRANCE_DATA_DIR` contents, `userdata/`, generated runtime JSON, or any other user data snapshots.
 - Local shell access is admin-only and supported on Linux, macOS, and Windows.
 - Flash/debug access is admin-only. The UI can optionally request elevated privileges before launching OpenOCD/pyOCD/probe-rs:
   - Linux: `pkexec`, or `sudo` with `zenity` / `kdialog` askpass

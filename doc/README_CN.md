@@ -3,11 +3,6 @@
 基于 Web 的服务器管理工具，支持 SSH 终端、本地 Shell 终端、VNC 远程桌面、WebSerial 串口终端、烧录调试和 SFTP 文件管理。采用 Microsoft Fluent Design 设计风格，支持亮色/暗色主题，并提供中文/英文界面切换。
 ![Screenshot](screenshot_cn.png)
 
-## 友链
-
-- EK-OmniProbe https://github.com/EmbeddedKitOrg/EK-OmniProbe
-- Clion-Waveform-Plotter https://github.com/Szturin/Clion-Waveform-Plotter
-
 ## 功能特性
 
 ### SSH 终端
@@ -105,6 +100,10 @@
 ### 界面特性
 - Microsoft Fluent Design 设计风格
 - 亮色/暗色主题切换
+- **分阶段启动动画**
+  - 当存在可恢复的登录态且未启用 `ENTRANCE_DESKTOP_NOLOGIN=1` 时，界面会显示 Material You 风格的波浪启动页，并在中央展示带圆角矩形裁剪的 `logo.png`
+  - 即使启动很快，也会保留至少 3 秒的进度条动画
+  - 启动顺序为先渲染前端工作台外壳，再分阶段初始化终端、串口、VNC、本机 Shell 与安全设置等模块
 - **Material You 配色方案** - 6 套可选强调色方案
   - 默认方案（中性石墨）
   - 樱花粉（柔和花瓣）
@@ -123,6 +122,8 @@
 ### 设置
 - **修改密码** - 用户可在设置页面修改自己的登录密码（Argon2id 加密）
 - 当 `ENTRANCE_DESKTOP_NOLOGIN=1` 时，密码修改功能禁用并显示提示
+- **登录保持** - 密码登录默认保持 7 天，可在设置页使用预设（`7d`、`14d`、`1m`、`never`）或自定义表达式修改
+- 只要 `AUTH_SECRET` 保持不变，重启后仍可复用已保存的登录态；若 `AUTH_SECRET` 改变，则会强制重新登录
 - **内网白名单** - 管理员可在设置页中通过位于修改密码卡片下方的独立卡片管理 SSH、SFTP、VNC 使用的私有网段白名单
 - **配色方案切换** - 在设置页面选择 Material You Design 风格的配色方案，选择自动保存
 - **语言切换** - 在设置页面配色方案下方的独立卡片中切换界面语言，默认英文，当前支持中文和英文
@@ -252,10 +253,10 @@ podman run -d --name entrance-tools \
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP 服务监听端口，也可通过 `npm start -- --port 4000` 覆盖 |
-| `ENTRANCE_DATA_DIR` | 项目根目录 | 持久化数据目录，包含 `users.json`、`userdata/`、`known_hosts.json`、`private-networks.json`、`.ssh_password_key` |
+| `ENTRANCE_DATA_DIR` | 项目根目录 | 持久化数据目录，包含 `users.json`、`userdata/`、`known_hosts.json`、`private-networks.json`、`.ssh_password_key`、`LOGIN_KEEP` |
 | `AUTH_SECRET` | 无，必填 | 登录 token 签名密钥，要求至少 32 字节（base64 或 64 字符十六进制） |
 | `SSH_PASSWORD_KEY` | 未设置时自动生成 `.ssh_password_key` | 用于加密 SSH/SFTP 凭据与私有网络白名单的 32 字节密钥；如果手动设置，必须在重启后保持不变 |
-| `AUTH_TOKEN_TTL` | `43200` | 登录 token 有效期（秒） |
+| `AUTH_TOKEN_TTL` | `604800` | 密码登录默认 token 有效期（秒）；可被设置页中的登录保持时间覆盖 |
 | `LOGIN_WINDOW_MS` | `900000` | 登录失败限流时间窗口（毫秒） |
 | `LOGIN_MAX_ATTEMPTS` | `5` | 时间窗口内允许的最大失败登录次数 |
 | `STRICT_HOST_KEY_CHECKING` | `false` | 设为 `true` 时拒绝未知 SSH 主机指纹 |
@@ -280,6 +281,7 @@ podman run -d --name entrance-tools \
 ├── package.json         # 依赖配置
 ├── users.json           # 用户数据（自动生成，可位于 ENTRANCE_DATA_DIR）
 ├── .ssh_password_key    # SSH 凭据加密密钥（自动生成）
+├── LOGIN_KEEP           # 用于登录保持的密码登录时间戳（已加密）
 ├── known_hosts.json     # SSH 主机指纹（自动生成）
 ├── private-networks.json  # 私有网络白名单（自动生成，已加密）
 └── userdata/            # 用户数据目录（自动生成）
@@ -313,6 +315,7 @@ podman run -d --name entrance-tools \
 
 ### 认证
 - `POST /api/auth/login` - 登录并返回 token
+- `POST /api/auth/session` - 使用新的登录保持时间刷新当前 token
 - `POST /api/auth/verify` - 校验 token
 
 所有 API 需在请求头携带 `Authorization: Bearer <token>`。
@@ -620,7 +623,10 @@ memory:[used:8192, free:4096, cached:2048]
 ## 安全说明
 
 - 登录默认启用，登录 token 使用 `AUTH_SECRET` 进行签名；仅在 `ENTRANCE_DESKTOP_NOLOGIN=1` 时跳过登录流程。
+- 密码登录默认保持 7 天，可在设置页修改；当前偏好保存在浏览器本地存储，并可立即刷新当前会话。
+- 浏览器仅会在 token 校验成功且当前 `AUTH_SECRET` 指纹与该会话记录一致时继续复用本地登录态。
 - `users.json` 中的密码使用 `Argon2id` 哈希存储；旧版明文密码会在用户成功登录后自动迁移。
+- 最近一次密码登录的 Unix 时间戳保存在 `ENTRANCE_DATA_DIR/LOGIN_KEEP` 中，并使用基于 `AUTH_SECRET` 派生密钥的 AES-256-GCM 加密。
 - SSH/SFTP 凭据（密码、私钥、私钥口令）仅保存在用户浏览器本地或服务端用户数据中，服务端落盘会使用 `SSH_PASSWORD_KEY` 进行 AES-256-GCM 加密。
 - 私有网络白名单存储在 `private-networks.json` 中，服务端落盘同样使用 `SSH_PASSWORD_KEY` 进行 AES-256-GCM 加密。
 - `SSH_PASSWORD_KEY` 变更后，历史已加密凭据和白名单将无法解密；需要恢复原密钥或重新录入数据。
@@ -634,6 +640,11 @@ memory:[used:8192, free:4096, cached:2048]
   - 将 `OpenOCD`、`pyOCD`、`probe-rs`、`pkexec`、`sudo`、`gsudo` 等可执行文件来源控制在可信范围
   - 仅在确有设备访问或驱动权限需求时启用“请求管理员/root 权限”
   - 若使用 Linux 图形密码对话框模式，请确认 `zenity` 或 `kdialog` 来自系统包管理器
+
+### 友链
+
+- EK-OmniProbe https://github.com/EmbeddedKitOrg/EK-OmniProbe
+- Clion-Waveform-Plotter https://github.com/Szturin/Clion-Waveform-Plotter
 
 ## 许可证
 

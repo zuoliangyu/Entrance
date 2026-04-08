@@ -63,11 +63,14 @@ const USER_DATA_DIR = path.join(DATA_DIR, 'userdata');
 const KNOWN_HOSTS_FILE = path.join(DATA_DIR, 'known_hosts.json');
 const PRIVATE_NETWORKS_FILE = path.join(DATA_DIR, 'private-networks.json');
 const SSH_PASSWORD_KEY_FILE = path.join(DATA_DIR, '.ssh_password_key');
+const LOGIN_KEEP_FILE = path.join(DATA_DIR, 'LOGIN_KEEP');
 
 const AUTH_SECRET_ENV = 'AUTH_SECRET';
-const AUTH_TOKEN_TTL = parseInt(process.env.AUTH_TOKEN_TTL || '43200', 10);
+const AUTH_TOKEN_TTL = parseInt(process.env.AUTH_TOKEN_TTL || '604800', 10);
 const LOGIN_WINDOW_MS = parseInt(process.env.LOGIN_WINDOW_MS || '900000', 10);
 const LOGIN_MAX_ATTEMPTS = parseInt(process.env.LOGIN_MAX_ATTEMPTS || '5', 10);
+const DEFAULT_LOGIN_KEEP_SECONDS = Number.isFinite(AUTH_TOKEN_TTL) && AUTH_TOKEN_TTL >= 0 ? AUTH_TOKEN_TTL : 604800;
+const MAX_LOGIN_KEEP_SECONDS = 10 * 365 * 24 * 60 * 60;
 const DESKTOP_NOLOGIN = process.env.ENTRANCE_DESKTOP_NOLOGIN === '1';
 const DESKTOP_VERSION = String(process.env.ENTRANCE_DESKTOP_VERSION || '').trim();
 const PROJECT_HOMEPAGE = 'https://github.com/fcanlnony/Entrance';
@@ -81,6 +84,7 @@ const ALLOW_PRIVATE_NETWORKS = process.env.ALLOW_PRIVATE_NETWORKS === 'true';
 
 const SSH_PASSWORD_ENV = 'SSH_PASSWORD_KEY';
 const SSH_PASSWORD_PREFIX = 'enc:v1:';
+const LOGIN_KEEP_PREFIX = 'loginkeep:v1:';
 let sshPasswordKeyCache = null;
 const SSH_AUTH_TYPE_PASSWORD = 'password';
 const SSH_AUTH_TYPE_KEY = 'key';
@@ -155,34 +159,110 @@ function getSshPasswordKey() {
     return sshPasswordKeyCache;
 }
 
-function isEncryptedSecret(value) {
-    return typeof value === 'string' && value.startsWith(SSH_PASSWORD_PREFIX);
+function isEncryptedWithPrefix(value, prefix) {
+    return typeof value === 'string' && value.startsWith(prefix);
 }
 
-function encryptSshPassword(plaintext) {
+function encryptSecretValue(plaintext, key, prefix) {
     if (!plaintext) return '';
-    const key = getSshPasswordKey();
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
     const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
-    return `${SSH_PASSWORD_PREFIX}${iv.toString('base64')}:${tag.toString('base64')}:${encrypted.toString('base64')}`;
+    return `${prefix}${iv.toString('base64')}:${tag.toString('base64')}:${encrypted.toString('base64')}`;
 }
 
-function decryptSshPassword(payload) {
-    if (!payload || !isEncryptedSecret(payload)) return payload || '';
+function decryptSecretValue(payload, key, prefix, label) {
+    if (!payload || !isEncryptedWithPrefix(payload, prefix)) return payload || '';
     const parts = payload.split(':');
     if (parts.length !== 5) {
-        throw new Error('Invalid encrypted SSH password format');
+        throw new Error(`Invalid encrypted ${label} format`);
     }
     const iv = Buffer.from(parts[2], 'base64');
     const tag = Buffer.from(parts[3], 'base64');
     const encrypted = Buffer.from(parts[4], 'base64');
-    const key = getSshPasswordKey();
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
     decipher.setAuthTag(tag);
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return decrypted.toString('utf8');
+}
+
+function getAuthDerivedKey(label) {
+    return crypto
+        .createHash('sha256')
+        .update(getAuthSecret())
+        .update('\0')
+        .update(String(label || ''))
+        .digest();
+}
+
+function isEncryptedSecret(value) {
+    return isEncryptedWithPrefix(value, SSH_PASSWORD_PREFIX);
+}
+
+function encryptSshPassword(plaintext) {
+    return encryptSecretValue(plaintext, getSshPasswordKey(), SSH_PASSWORD_PREFIX);
+}
+
+function decryptSshPassword(payload) {
+    return decryptSecretValue(payload, getSshPasswordKey(), SSH_PASSWORD_PREFIX, 'SSH password');
+}
+
+function getAuthSecretFingerprint() {
+    return crypto
+        .createHash('sha256')
+        .update(getAuthSecret())
+        .update('\0')
+        .update('auth-fingerprint:v1')
+        .digest('hex')
+        .slice(0, 32);
+}
+
+function normalizeLoginKeepSeconds(value) {
+    if (value === undefined || value === null || value === '') {
+        return DEFAULT_LOGIN_KEEP_SECONDS;
+    }
+    if (typeof value === 'string' && value.trim().toLowerCase() === 'never') {
+        return 0;
+    }
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
+        throw new Error('keepSeconds 必须是大于等于 0 的整数秒数');
+    }
+    if (parsed === 0) {
+        return 0;
+    }
+    if (parsed > MAX_LOGIN_KEEP_SECONDS) {
+        throw new Error(`keepSeconds 超出允许范围，最大为 ${MAX_LOGIN_KEEP_SECONDS} 秒`);
+    }
+    return parsed;
+}
+
+function writeLoginKeepTimestamp(timestampSeconds) {
+    const normalized = parseInt(timestampSeconds, 10);
+    if (!Number.isFinite(normalized) || normalized <= 0) {
+        throw new Error('LOGIN_KEEP 时间戳无效');
+    }
+    const encrypted = encryptSecretValue(String(normalized), getAuthDerivedKey('login-keep:v1'), LOGIN_KEEP_PREFIX);
+    fs.writeFileSync(LOGIN_KEEP_FILE, `${encrypted}\n`, { mode: 0o600 });
+}
+
+function readLoginKeepTimestamp() {
+    if (!fs.existsSync(LOGIN_KEEP_FILE)) {
+        return 0;
+    }
+    try {
+        const stored = fs.readFileSync(LOGIN_KEEP_FILE, 'utf8').trim();
+        if (!stored) {
+            return 0;
+        }
+        const decrypted = decryptSecretValue(stored, getAuthDerivedKey('login-keep:v1'), LOGIN_KEEP_PREFIX, 'LOGIN_KEEP');
+        const parsed = parseInt(decrypted, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    } catch (err) {
+        console.error('[Auth] 读取 LOGIN_KEEP 失败:', err.message);
+        return 0;
+    }
 }
 
 function normalizeStringValue(value, fieldName, maxLength, { trim = false } = {}) {
@@ -296,10 +376,14 @@ async function hashPassword(password) {
     return argon2.hash(password, { type: argon2.argon2id });
 }
 
-function signToken(payload, ttlSeconds) {
+function signToken(payload, ttlSeconds = DEFAULT_LOGIN_KEEP_SECONDS) {
     const header = { alg: 'HS256', typ: 'JWT' };
     const now = Math.floor(Date.now() / 1000);
-    const body = { ...payload, iat: now, exp: now + ttlSeconds };
+    const body = { ...payload, iat: now };
+    const normalizedTtl = Number.isFinite(ttlSeconds) ? Math.trunc(ttlSeconds) : DEFAULT_LOGIN_KEEP_SECONDS;
+    if (normalizedTtl > 0) {
+        body.exp = now + normalizedTtl;
+    }
     const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
     const encodedBody = Buffer.from(JSON.stringify(body)).toString('base64url');
     const input = `${encodedHeader}.${encodedBody}`;
@@ -336,7 +420,9 @@ function getPublicAppInfo() {
     const info = {
         version: APP_VERSION,
         projectHomepage: PROJECT_HOMEPAGE,
-        desktopNoLogin: DESKTOP_NOLOGIN
+        desktopNoLogin: DESKTOP_NOLOGIN,
+        authSecretFingerprint: getAuthSecretFingerprint(),
+        defaultLoginKeepSeconds: DEFAULT_LOGIN_KEEP_SECONDS
     };
     if (DESKTOP_NOLOGIN) {
         info.desktopVersion = DESKTOP_VERSION || '未设置';
@@ -764,6 +850,26 @@ const UserManager = {
     }
 };
 
+function getUserAuthPayload(username) {
+    const user = UserManager.get(username);
+    if (!user) {
+        return null;
+    }
+    return { sub: username, role: user.role || 'user' };
+}
+
+function buildAuthSuccessResponse(payload, keepSeconds) {
+    return {
+        success: true,
+        token: signToken(payload, keepSeconds),
+        username: payload.sub,
+        role: payload.role,
+        keepSeconds,
+        loginKeepTimestamp: readLoginKeepTimestamp(),
+        ...getPublicAppInfo()
+    };
+}
+
 // 用户数据管理（主机列表、统计等）
 const UserDataManager = {
     getFilePath(userId) {
@@ -979,9 +1085,15 @@ function generateSessionId() {
 
 // 登录
 app.post('/api/auth/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, keepSeconds: rawKeepSeconds } = req.body || {};
     if (!username || !password) {
         return res.status(400).json({ success: false, error: '用户名和密码不能为空' });
+    }
+    let keepSeconds = DEFAULT_LOGIN_KEEP_SECONDS;
+    try {
+        keepSeconds = normalizeLoginKeepSeconds(rawKeepSeconds);
+    } catch (err) {
+        return res.status(400).json({ success: false, error: err.message });
     }
     const rateKey = getLoginAttemptKey(req);
     if (isLoginRateLimited(rateKey)) {
@@ -990,8 +1102,14 @@ app.post('/api/auth/login', async (req, res) => {
     const result = await UserManager.verify(username, password);
     if (result.success) {
         recordLoginAttempt(rateKey, true);
-        const token = signToken({ sub: username, role: result.role }, AUTH_TOKEN_TTL);
-        res.json({ success: true, token, username, role: result.role });
+        try {
+            writeLoginKeepTimestamp(Math.floor(Date.now() / 1000));
+        } catch (err) {
+            console.error('[Auth] 写入 LOGIN_KEEP 失败:', err.message);
+            return res.status(500).json({ success: false, error: '保存登录状态失败' });
+        }
+        const authPayload = getUserAuthPayload(username) || { sub: username, role: result.role };
+        res.json(buildAuthSuccessResponse(authPayload, keepSeconds));
     } else {
         recordLoginAttempt(rateKey, false);
         res.status(401).json({ success: false, error: '用户名或密码错误' });
@@ -1019,7 +1137,34 @@ app.get('/api/app-info', (req, res) => {
 
 // 验证已保存的登录状态
 app.post('/api/auth/verify', requireAuth, (req, res) => {
-    res.json({ success: true, username: req.auth.sub, role: req.auth.role });
+    res.json({
+        success: true,
+        username: req.auth.sub,
+        role: req.auth.role,
+        loginKeepTimestamp: readLoginKeepTimestamp(),
+        ...getPublicAppInfo()
+    });
+});
+
+// 刷新当前登录态的有效期
+app.post('/api/auth/session', requireAuth, (req, res) => {
+    let keepSeconds = DEFAULT_LOGIN_KEEP_SECONDS;
+    try {
+        keepSeconds = normalizeLoginKeepSeconds(req.body?.keepSeconds);
+    } catch (err) {
+        return res.status(400).json({ success: false, error: err.message });
+    }
+
+    const noLoginPayload = getNoLoginPayload();
+    const authPayload = noLoginPayload && req.auth.sub === noLoginPayload.sub
+        ? noLoginPayload
+        : getUserAuthPayload(req.auth.sub);
+
+    if (!authPayload) {
+        return res.status(404).json({ success: false, error: '用户不存在' });
+    }
+
+    res.json(buildAuthSuccessResponse(authPayload, keepSeconds));
 });
 
 // 保护所有 API（登录接口除外）

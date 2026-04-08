@@ -38,8 +38,8 @@ PORT=4000 docker compose up -d --build
 - `AUTH_SECRET` (required) - Auth token signing key; must decode to at least 32 bytes.
 - `SSH_PASSWORD_KEY` (optional) - 32-byte AES key for stored SSH credentials and private-network allowlists; if omitted, the server writes a generated key to `.ssh_password_key` under `ENTRANCE_DATA_DIR`.
 - `PORT` - HTTP port, defaults to `3000`; can also be overridden by the `--port` / `-p` startup flag.
-- `ENTRANCE_DATA_DIR` - Runtime data directory for `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, and `.ssh_password_key`. Do not upload or commit this directory, `.data/`, or any other user/runtime data directories.
-- `AUTH_TOKEN_TTL` - Bearer token lifetime in seconds, defaults to `43200`.
+- `ENTRANCE_DATA_DIR` - Runtime data directory for `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, `LOGIN_KEEP`, and `.ssh_password_key`. Do not upload or commit this directory, `.data/`, or any other user/runtime data directories.
+- `AUTH_TOKEN_TTL` - Default password-login token lifetime in seconds, defaults to `604800` and can be overridden from the in-app Settings keepalive control.
 - `LOGIN_WINDOW_MS` / `LOGIN_MAX_ATTEMPTS` - Login rate-limit window and failure threshold.
 - `STRICT_HOST_KEY_CHECKING` - When `true`, reject unknown SSH host keys instead of learning them.
 - `ALLOWED_TARGETS` - Comma-separated allowlist for SSH/VNC target hosts; supports exact names and `*.example.com` patterns.
@@ -56,6 +56,7 @@ PORT=4000 docker compose up -d --build
 ├── Dockerfile          # Container image build
 ├── public/
 │   ├── index.html      # Single-page frontend (HTML + CSS + JavaScript)
+│   ├── logo.png        # Startup splash logo shown inside the rounded loading card
 │   └── vnc-client.js   # VNC browser client
 ├── server.js           # Express backend server (HTTP + WebSocket + auth + SSH/SFTP/Docker)
 ├── local-shell.js      # Local shell module (Linux/macOS via script, Windows via direct shell spawn)
@@ -63,6 +64,7 @@ PORT=4000 docker compose up -d --build
 ├── vnc.js              # VNC WebSocket proxy
 ├── package.json        # Dependency manifest
 ├── users.json          # User account data (generated at runtime, Argon2 hashes)
+├── LOGIN_KEEP          # Encrypted password-login timestamp used for session keepalive
 ├── known_hosts.json    # SSH host key cache (generated at runtime)
 ├── private-networks.json  # Encrypted private CIDR allowlist (generated at runtime)
 ├── .ssh_password_key   # Generated AES key when SSH_PASSWORD_KEY is not supplied
@@ -75,6 +77,10 @@ PORT=4000 docker compose up -d --build
 - CSS variables for theme switching and Material You color scheme support (`data-color-scheme` attribute)
 - UI i18n support with English as the default language and Simplified Chinese as the secondary option
 - Microsoft Fluent Design style
+- Startup/auth overlay behavior:
+  - When a saved login is being restored and `ENTRANCE_DESKTOP_NOLOGIN` is not enabled, show a Material You wave splash with `public/logo.png` clipped into a rounded rectangle
+  - Keep a minimum 3-second progress animation even if backend verification is fast
+  - Render the dashboard shell first, then initialize backend-backed modules in stages
 - `FlashDebug` now uses a shared autocomplete pipeline for tool-specific target inputs:
   - OpenOCD target configs and interface configs
   - pyOCD target names from `pyocd list --targets --no-header`
@@ -85,7 +91,7 @@ PORT=4000 docker compose up -d --build
 - Express.js HTTP/REST API server
 - WebSocket upgrade handling for SSH, VNC, admin-only local shell sessions, and admin-only flash/debug sessions
 - ssh2 library for SSH/SFTP functionality
-- Auth/token system in `server.js` (signed bearer tokens, login throttling, optional no-login mode)
+- Auth/token system in `server.js` (signed bearer tokens, login throttling, encrypted `LOGIN_KEEP`, `AUTH_SECRET` fingerprint checks, optional no-login mode)
 - Private target validation via allowlists, private-network CIDR management, and known-host verification
 - File storage for user data, known hosts, and encrypted secrets
 - `flash-debug.js` wraps OpenOCD, pyOCD, and probe-rs, including optional OS-level privilege elevation requests
@@ -94,7 +100,7 @@ PORT=4000 docker compose up -d --build
 ### Core Modules
 1. **UserManager** - User account management, Argon2 hashing, and legacy plaintext migration
 2. **UserDataManager** - Per-user host storage and encrypted SSH credential persistence
-3. **Auth / Token System** - Login verification, rate limiting, signed bearer tokens, and optional desktop no-login mode
+3. **Auth / Token System** - Login verification, rate limiting, signed bearer tokens, `AUTH_SECRET` fingerprint-aware session reuse, encrypted `LOGIN_KEEP`, and optional desktop no-login mode
 4. **PrivateNetworkManager** - Admin-managed private CIDR allowlist stored encrypted at rest
 5. **Known Hosts Cache** - SSH host key pinning and strict host key checking support
 6. **SFTP Sessions** - In-memory SFTP session management
@@ -102,7 +108,7 @@ PORT=4000 docker compose up -d --build
 8. **Flash Debug Service** - Admin-only local flashing/debugging WebSocket + REST endpoints, tool discovery, uploads, and privilege-elevation wrapping
    - Includes shared target autocomplete catalogs for OpenOCD / pyOCD / probe-rs
 9. **Docker Stats** - Docker container resource monitoring via `docker stats --no-stream`
-10. **Settings** - In-app settings view for password change (disabled in `ENTRANCE_DESKTOP_NOLOGIN` mode), an admin-only private-network allowlist card below the password card, Material You color scheme selection (default, sakura, ocean, forest, twilight, amber), and a separate language selector card below the color scheme card (default English; supports Chinese/English)
+10. **Settings** - In-app settings view for password change (disabled in `ENTRANCE_DESKTOP_NOLOGIN` mode), login keepalive presets/custom duration input, an admin-only private-network allowlist card below the keepalive/password cards, Material You color scheme selection (default, sakura, ocean, forest, twilight, amber), and a separate language selector card below the color scheme card (default English; supports Chinese/English)
 
 ### SSH Monitoring Panels
 The SSH view includes three collapsible monitoring panels below the terminal:
@@ -153,6 +159,8 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
 
 - Default account: `admin / admin` on first boot.
 - Password storage: Argon2id hashes in `users.json`; legacy plaintext entries are upgraded on successful login.
+- Password-login keepalive defaults to 7 days. The browser stores the chosen duration and only keeps restoring the saved session while token verification succeeds and the current `AUTH_SECRET` fingerprint still matches.
+- `LOGIN_KEEP` stores the last successful password-login Unix timestamp encrypted with AES-256-GCM using a key derived from `AUTH_SECRET`.
 - Stored SSH credentials and private-network allowlist entries are AES-256-GCM encrypted with `SSH_PASSWORD_KEY`.
 - If `SSH_PASSWORD_KEY` changes, existing encrypted secrets become unreadable until the old key is restored or the values are re-entered.
 - SFTP sessions are stored in memory (Map).
@@ -165,6 +173,6 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
   - Windows: `gsudo` or `sudo`
 - Flash/debug target fields use shared local-search autocomplete. OpenOCD searches discovered config catalogs, pyOCD searches the target catalog returned by `pyocd list --targets --no-header`, and probe-rs searches the chip catalog returned by `probe-rs chip list`.
 - Flash/debug helper copy is part of the same shared frontend path. When changing placeholders, helper hints, or fallback enumeration/catalog messages, keep Chinese and English behavior aligned across OpenOCD, pyOCD, and probe-rs.
-- The Settings view allows users to change their own password via `PUT /api/users/:username/password` (Argon2id hashed). Admins also get a separate private-network allowlist card below the password card. When `ENTRANCE_DESKTOP_NOLOGIN=1`, the password form is hidden and a notice is shown instead.
+- The Settings view allows users to change their own password via `PUT /api/users/:username/password` (Argon2id hashed), adjust login keepalive via presets or a custom duration string, and, for admins, manage the private-network allowlist in a separate card. When `ENTRANCE_DESKTOP_NOLOGIN=1`, the password/login-restore UI stays disabled and the desktop wrapper is expected to provide the loading animation instead.
 - Color schemes are stored in `localStorage` (`colorScheme` key) and applied via the `data-color-scheme` attribute on `<html>`. Available schemes: default, sakura, ocean, forest, twilight, amber.
 - UI language is stored in `localStorage` (`language` key). The app defaults to English and currently supports Simplified Chinese and English.

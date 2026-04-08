@@ -311,15 +311,214 @@
         }
         .auth-overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
         .auth-card {
-            width: 340px; padding: 24px;
+            width: min(468px, calc(100vw - 32px));
+            padding: 24px;
             background: var(--color-bg-1);
             border: 1px solid var(--color-border);
-            border-radius: 14px;
+            border-radius: 32px;
             box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+            overflow: hidden;
+        }
+        .auth-panel.hidden { display: none; }
+        #authLoginPanel {
+            width: 100%;
+            max-width: 340px;
+            margin: 0 auto;
         }
         .auth-title { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
         .auth-sub { color: var(--color-text-2); font-size: 13px; margin-bottom: 18px; }
         .auth-error { min-height: 16px; color: var(--color-error); font-size: 12px; margin-top: 8px; }
+        .auth-loading-panel {
+            min-height: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .auth-boot-scene {
+            position: relative;
+            width: 100%;
+            height: 256px;
+            border-radius: 34px;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 20% 18%, rgba(118, 182, 255, 0.30), transparent 28%),
+                radial-gradient(circle at 78% 22%, rgba(255, 182, 193, 0.24), transparent 30%),
+                linear-gradient(180deg, #f5f7ff 0%, #edf3ff 42%, #dfe9ff 100%);
+            border: 1px solid rgba(132, 152, 190, 0.28);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.72),
+                0 16px 36px rgba(92, 113, 150, 0.16);
+        }
+        .auth-boot-glow {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(18px);
+            opacity: 0.72;
+            animation: authGlowDrift 8s ease-in-out infinite;
+        }
+        .auth-boot-glow.glow-a {
+            width: 180px;
+            height: 180px;
+            top: -48px;
+            left: -22px;
+            background: rgba(119, 187, 255, 0.34);
+        }
+        .auth-boot-glow.glow-b {
+            width: 150px;
+            height: 150px;
+            right: -20px;
+            top: 20px;
+            background: rgba(255, 170, 164, 0.24);
+            animation-delay: -3s;
+        }
+        .auth-wave {
+            position: absolute;
+            left: -12%;
+            right: -12%;
+            bottom: 0;
+            border-radius: 50% 50% 0 0 / 22% 22% 0 0;
+            transform-origin: center bottom;
+            animation: authWaveFloat 8s ease-in-out infinite;
+        }
+        .auth-wave.wave-back {
+            height: 44%;
+            bottom: 18px;
+            background: linear-gradient(180deg, rgba(90, 139, 226, 0.26) 0%, rgba(116, 166, 255, 0.42) 100%);
+        }
+        .auth-wave.wave-mid {
+            height: 34%;
+            bottom: 4px;
+            background: linear-gradient(180deg, rgba(116, 158, 236, 0.40) 0%, rgba(122, 181, 255, 0.60) 100%);
+            animation-duration: 6.5s;
+            animation-delay: -2s;
+        }
+        .auth-wave.wave-front {
+            height: 28%;
+            bottom: -10px;
+            background: linear-gradient(180deg, rgba(84, 125, 214, 0.66) 0%, rgba(93, 157, 255, 0.88) 100%);
+            animation-duration: 5.4s;
+            animation-delay: -1.1s;
+        }
+        .auth-logo-shell {
+            position: absolute;
+            left: 50%;
+            top: 48%;
+            width: 170px;
+            height: 108px;
+            transform: translate(-50%, -50%);
+            border-radius: 28px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.60);
+            border: 1px solid rgba(255, 255, 255, 0.58);
+            box-shadow:
+                0 18px 28px rgba(63, 91, 145, 0.22),
+                inset 0 1px 0 rgba(255, 255, 255, 0.78);
+            backdrop-filter: blur(12px);
+            z-index: 2;
+        }
+        .auth-logo-shell img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .auth-loading-copy {
+            display: grid;
+            gap: 6px;
+            text-align: center;
+            padding: 0 8px;
+        }
+        .auth-loading-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .auth-loading-sub {
+            color: var(--color-text-2);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .auth-progress-block {
+            display: grid;
+            gap: 10px;
+            padding: 0 6px;
+        }
+        .auth-progress-track {
+            position: relative;
+            width: 100%;
+            height: 10px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(198, 212, 236, 0.72) 0%, rgba(214, 224, 242, 0.92) 100%);
+            box-shadow: inset 0 1px 2px rgba(88, 106, 138, 0.14);
+        }
+        .auth-progress-fill {
+            position: relative;
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #5d8ef7 0%, #78b7ff 52%, #8ad7f4 100%);
+            transition: width .18s ease-out;
+            box-shadow: 0 6px 16px rgba(85, 141, 246, 0.28);
+        }
+        .auth-progress-fill::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(110deg, transparent 12%, rgba(255, 255, 255, 0.56) 48%, transparent 82%);
+            transform: translateX(-100%);
+            animation: authProgressSheen 1.6s ease-in-out infinite;
+        }
+        .auth-progress-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            color: var(--color-text-2);
+            font-size: 12px;
+        }
+        .auth-progress-stage {
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .auth-progress-value {
+            flex-shrink: 0;
+            font-variant-numeric: tabular-nums;
+            color: var(--color-text);
+            font-weight: 600;
+        }
+        @keyframes authWaveFloat {
+            0%, 100% { transform: translateX(-2%) translateY(0) scaleX(1); }
+            50% { transform: translateX(2%) translateY(-10px) scaleX(1.03); }
+        }
+        @keyframes authGlowDrift {
+            0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+            50% { transform: translate3d(12px, 10px, 0) scale(1.08); }
+        }
+        @keyframes authProgressSheen {
+            to { transform: translateX(160%); }
+        }
+        @media (max-width: 560px) {
+            .auth-card {
+                width: calc(100vw - 24px);
+                padding: 18px;
+                border-radius: 28px;
+            }
+            .auth-loading-panel {
+                min-height: 430px;
+                gap: 16px;
+            }
+            .auth-boot-scene {
+                height: 220px;
+                border-radius: 28px;
+            }
+            .auth-logo-shell {
+                width: 148px;
+                height: 96px;
+                border-radius: 24px;
+            }
+        }
         .logout-btn {
             background: var(--color-bg-3);
             border: 1px solid var(--color-border);
@@ -1472,6 +1671,22 @@
             font-weight: 600;
         }
         .settings-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+        .settings-keep-grid {
+            display: grid;
+            grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+            gap: 12px;
+            align-items: end;
+        }
+        .settings-keep-status {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: var(--color-bg-2);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-2);
+            font-size: 13px;
+            line-height: 1.6;
+        }
         .scheme-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px;
         }
@@ -1548,6 +1763,7 @@
             .language-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
             .settings-link-panel { align-items: flex-start; flex-direction: column; }
             .settings-link-action { margin-left: 32px; }
+            .settings-keep-grid { grid-template-columns: 1fr; }
         }
 
         /* Modal */
@@ -1826,18 +2042,45 @@
     <!-- 登录遮罩 -->
     <div class="auth-overlay" id="authOverlay">
         <div class="auth-card">
-            <div class="auth-title">Entrance Tools</div>
-            <div class="auth-sub">请使用账户登录</div>
-            <div class="form-group">
-                <label>用户名</label>
-                <input type="text" class="form-input" id="loginUser" placeholder="admin">
+            <div class="auth-panel" id="authLoginPanel">
+                <div class="auth-title">Entrance Tools</div>
+                <div class="auth-sub">请使用账户登录</div>
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" class="form-input" id="loginUser" placeholder="admin">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" class="form-input" id="loginPass" placeholder="密码">
+                </div>
+                <button class="btn btn-block" id="loginBtn"><i class="fas fa-right-to-bracket"></i> 登录</button>
+                <div class="auth-error" id="authError"></div>
             </div>
-            <div class="form-group">
-                <label>密码</label>
-                <input type="password" class="form-input" id="loginPass" placeholder="密码">
+            <div class="auth-panel auth-loading-panel hidden" id="authLoadingPanel">
+                <div class="auth-boot-scene" aria-hidden="true">
+                    <div class="auth-boot-glow glow-a"></div>
+                    <div class="auth-boot-glow glow-b"></div>
+                    <div class="auth-wave wave-back"></div>
+                    <div class="auth-wave wave-mid"></div>
+                    <div class="auth-wave wave-front"></div>
+                    <div class="auth-logo-shell">
+                        <img src="logo.png" alt="Entrance Tools logo">
+                    </div>
+                </div>
+                <div class="auth-loading-copy">
+                    <div class="auth-loading-title" id="authLoadingTitle">正在恢复登录状态...</div>
+                    <div class="auth-loading-sub" id="authLoadingSub">正在验证本地保存的登录态，请稍候。</div>
+                </div>
+                <div class="auth-progress-block">
+                    <div class="auth-progress-track">
+                        <div class="auth-progress-fill" id="authProgressFill"></div>
+                    </div>
+                    <div class="auth-progress-meta">
+                        <span class="auth-progress-stage" id="authProgressStage">正在准备界面...</span>
+                        <span class="auth-progress-value" id="authProgressValue">0%</span>
+                    </div>
+                </div>
             </div>
-            <button class="btn btn-block" id="loginBtn"><i class="fas fa-right-to-bracket"></i> 登录</button>
-            <div class="auth-error" id="authError"></div>
         </div>
     </div>
 
@@ -2923,6 +3166,34 @@
                                     </div>
                                 </div>
                             </section>
+                            <section class="settings-card">
+                                <h3><i class="fas fa-hourglass-half"></i> 登录保持</h3>
+                                <p class="settings-desc">默认保持 7 天，支持预设或自定义输入，例如 7d、14d、1m、12h、never</p>
+                                <div class="settings-note" id="settingsLoginKeepNologinNotice" style="display:none">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span>免登录模式下不会使用登录保持时间</span>
+                                </div>
+                                <div class="settings-keep-grid">
+                                    <div class="form-group">
+                                        <label>预设</label>
+                                        <select class="form-input" id="settingsLoginKeepPreset">
+                                            <option value="7d">7d</option>
+                                            <option value="14d">14d</option>
+                                            <option value="1m">1m</option>
+                                            <option value="never">never</option>
+                                            <option value="custom">自定义</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>时长表达式</label>
+                                        <input type="text" class="form-input" id="settingsLoginKeepInput" placeholder="7d / 14d / 1m / never">
+                                    </div>
+                                </div>
+                                <div class="settings-actions">
+                                    <button class="btn" id="settingsSaveLoginKeepBtn"><i class="fas fa-hourglass-half"></i> 保存登录保持时间</button>
+                                </div>
+                                <div class="settings-keep-status" id="settingsLoginKeepStatus">当前登录保持时间：7d</div>
+                            </section>
                             <section class="settings-card" id="settingsPrivateNetworkSection" style="display:none">
                                 <h3><i class="fas fa-shield-halved"></i> 内网白名单</h3>
                                 <button type="button" class="settings-link-panel" id="settingsOpenPrivateNetworksBtn">
@@ -3084,6 +3355,8 @@
             WS_BASE: `${wsProtocol}//${location.host}`
         };
 
+        const DEFAULT_LOGIN_KEEP_VALUE = '7d';
+
         const State = {
             loggedIn: false,
             isAdmin: false,
@@ -3093,6 +3366,8 @@
             language: 'en',
             appVersion: '0.1.9',
             projectHomepage: 'https://github.com/fcanlnony/Entrance',
+            authSecretFingerprint: '',
+            defaultLoginKeepSeconds: 604800,
             desktopVersion: '',
             desktopProjectHomepage: 'https://github.com/EntranceToolBox/Entrance-Desktop',
             showDesktopClientInfo: false,
@@ -3120,8 +3395,29 @@
             setLanguage(language) { localStorage.setItem('language', language); },
             getToken() { return localStorage.getItem('authToken') || ''; },
             setToken(t) { localStorage.setItem('authToken', t); },
-            clearToken() { localStorage.removeItem('authToken'); }
+            clearToken() { localStorage.removeItem('authToken'); },
+            getAuthSecretFingerprint() { return localStorage.getItem('authSecretFingerprint') || ''; },
+            setAuthSecretFingerprint(fingerprint) { localStorage.setItem('authSecretFingerprint', fingerprint); },
+            clearAuthSecretFingerprint() { localStorage.removeItem('authSecretFingerprint'); },
+            getLoginKeepValue() { return localStorage.getItem('loginKeepValue') || DEFAULT_LOGIN_KEEP_VALUE; },
+            setLoginKeepValue(value) { localStorage.setItem('loginKeepValue', value); }
         };
+
+        function applyPublicAppInfo(data = {}) {
+            if (!data || typeof data !== 'object') return;
+            State.appVersion = data.version || State.appVersion;
+            State.projectHomepage = data.projectHomepage || State.projectHomepage;
+            State.showDesktopClientInfo = data.desktopNoLogin === true;
+            State.desktopVersion = data.desktopVersion || '';
+            State.desktopProjectHomepage = data.desktopProjectHomepage || State.desktopProjectHomepage;
+            State.authSecretFingerprint = data.authSecretFingerprint || State.authSecretFingerprint;
+            if (Number.isFinite(Number(data.defaultLoginKeepSeconds)) && Number(data.defaultLoginKeepSeconds) >= 0) {
+                State.defaultLoginKeepSeconds = Number(data.defaultLoginKeepSeconds);
+            }
+            if (window.About && typeof window.About.render === 'function') {
+                try { window.About.render(); } catch {}
+            }
+        }
 
         const I18n = {
             observer: null,
@@ -3134,6 +3430,18 @@
                 en: {
                     '切换主题': 'Toggle theme',
                     '请使用账户登录': 'Please sign in with your account',
+                    '正在恢复登录状态...': 'Restoring your session...',
+                    '正在验证本地保存的登录态，请稍候。': 'Checking the saved local session. Please wait.',
+                    '正在启动工作台...': 'Starting the workspace...',
+                    '先载入界面，再分阶段连接服务模块。': 'Rendering the interface first, then loading service modules in stages.',
+                    '正在准备界面...': 'Preparing the interface...',
+                    '正在渲染工作台...': 'Rendering the workspace...',
+                    '正在初始化终端模块...': 'Initializing terminal modules...',
+                    '正在初始化串口与远程桌面模块...': 'Initializing serial and remote desktop modules...',
+                    '正在同步本机终端能力...': 'Syncing local shell capabilities...',
+                    '正在加载主机列表...': 'Loading saved hosts...',
+                    '正在加载安全设置...': 'Loading security settings...',
+                    '启动完成': 'Startup complete',
                     '用户名': 'Username',
                     '密码': 'Password',
                     '登录': 'Sign in',
@@ -3350,6 +3658,21 @@
                     '修改密码': 'Change Password',
                     '当前账户：': 'Current account:',
                     '桌面应用不允许修改密码': 'Password changes are disabled in the desktop app',
+                    '登录保持': 'Session Keepalive',
+                    '默认保持 7 天，支持预设或自定义输入，例如 7d、14d、1m、12h、never': 'Keep the session for 7 days by default. Presets and custom values such as 7d, 14d, 1m, 12h, and never are supported.',
+                    '免登录模式下不会使用登录保持时间': 'Session keepalive is not used in no-login mode.',
+                    '预设': 'Preset',
+                    '自定义': 'Custom',
+                    '时长表达式': 'Duration expression',
+                    '保存登录保持时间': 'Save session keepalive',
+                    '当前登录保持时间：': 'Current session keepalive: ',
+                    '请输入登录保持时间': 'Enter a session keepalive duration',
+                    '登录保持时间格式无效，示例：7d、14d、1m、12h、never': 'Invalid session keepalive format. Examples: 7d, 14d, 1m, 12h, never.',
+                    '登录保持时间过长，请控制在 10 年以内': 'The session keepalive is too long. Keep it within 10 years.',
+                    '登录保持时间已保存，当前免登录模式不会使用该设置': 'The session keepalive has been saved. It is not used in no-login mode.',
+                    '登录保持时间已保存，将在下次登录时生效': 'The session keepalive has been saved and will take effect on the next sign-in.',
+                    '登录保持时间已更新': 'Session keepalive updated',
+                    '登录保持时间更新失败': 'Failed to update the session keepalive',
                     '新密码': 'New password',
                     '输入新密码': 'Enter a new password',
                     '确认密码': 'Confirm password',
@@ -3889,7 +4212,9 @@
                     [/^加载白名单失败: (.+)$/u, (_match, message) => `Failed to load allowlist: ${I18n.auto(message)}`],
                     [/^密码修改失败: (.+)$/u, (_match, message) => `Password update failed: ${I18n.auto(message)}`],
                     [/^登录失败: (.+)$/u, (_match, message) => `Sign-in failed: ${I18n.auto(message)}`],
+                    [/^登录保持时间更新失败: (.+)$/u, (_match, message) => `Session keepalive update failed: ${I18n.auto(message)}`],
                     [/^连接失败: (.+)$/u, (_match, message) => `Connection failed: ${I18n.auto(message)}`],
+                    [/^当前登录保持时间：(.+)$/u, 'Current session keepalive: $1'],
                     [/^列表错误: (.+)$/u, (_match, message) => `List error: ${I18n.auto(message)}`],
                     [/^例如\s*(.+)$/u, (_match, example) => `For example: ${String(example || '').replace(/、/gu, ', ').replace(/\s*或\s*/gu, ' or ').trim()}`],
                     [/^正在下载: (.+)$/u, 'Downloading: $1'],
@@ -4524,15 +4849,131 @@
                 { key: 'en', code: 'EN', label: 'English', tone: '默认界面语言' },
                 { key: 'zh', code: 'ZH', label: '简体中文', tone: '简体中文界面' }
             ],
+            LOGIN_KEEP_PRESETS: ['7d', '14d', '1m', 'never'],
             init() {
                 document.getElementById('settingsChangePasswordBtn').addEventListener('click', () => this.changePassword());
+                document.getElementById('settingsSaveLoginKeepBtn').addEventListener('click', () => this.saveLoginKeep());
                 document.getElementById('settingsOpenPrivateNetworksBtn').addEventListener('click', () => this.openPrivateNetworks());
                 document.getElementById('securityBackToSettingsBtn').addEventListener('click', () => UI.switchView('settings'));
+                document.getElementById('settingsLoginKeepPreset').addEventListener('change', (event) => this.handleLoginKeepPresetChange(event.target.value));
+                document.getElementById('settingsLoginKeepInput').addEventListener('input', () => this.syncLoginKeepPresetFromInput());
+                document.getElementById('settingsLoginKeepInput').addEventListener('keypress', (event) => {
+                    if (event.key === 'Enter') this.saveLoginKeep();
+                });
                 ['settingsNewPassword', 'settingsConfirmPassword'].forEach(id => {
                     document.getElementById(id).addEventListener('keypress', e => {
                         if (e.key === 'Enter') this.changePassword();
                     });
                 });
+            },
+            parseLoginKeepValue(value) {
+                const raw = String(value || '').trim().toLowerCase();
+                if (!raw) {
+                    throw new Error('请输入登录保持时间');
+                }
+                if (raw === 'never') {
+                    return { seconds: 0, display: 'never' };
+                }
+                const match = raw.match(/^(\d+)\s*([a-z\u4e00-\u9fa5]+)$/iu);
+                if (!match) {
+                    throw new Error('登录保持时间格式无效，示例：7d、14d、1m、12h、never');
+                }
+                const amount = Number(match[1]);
+                const unit = match[2];
+                const unitMap = {
+                    s: { seconds: 1, display: 's' },
+                    sec: { seconds: 1, display: 's' },
+                    secs: { seconds: 1, display: 's' },
+                    second: { seconds: 1, display: 's' },
+                    seconds: { seconds: 1, display: 's' },
+                    秒: { seconds: 1, display: 's' },
+                    min: { seconds: 60, display: 'min' },
+                    mins: { seconds: 60, display: 'min' },
+                    minute: { seconds: 60, display: 'min' },
+                    minutes: { seconds: 60, display: 'min' },
+                    分: { seconds: 60, display: 'min' },
+                    分钟: { seconds: 60, display: 'min' },
+                    h: { seconds: 3600, display: 'h' },
+                    hr: { seconds: 3600, display: 'h' },
+                    hrs: { seconds: 3600, display: 'h' },
+                    hour: { seconds: 3600, display: 'h' },
+                    hours: { seconds: 3600, display: 'h' },
+                    小时: { seconds: 3600, display: 'h' },
+                    d: { seconds: 86400, display: 'd' },
+                    day: { seconds: 86400, display: 'd' },
+                    days: { seconds: 86400, display: 'd' },
+                    天: { seconds: 86400, display: 'd' },
+                    w: { seconds: 604800, display: 'w' },
+                    week: { seconds: 604800, display: 'w' },
+                    weeks: { seconds: 604800, display: 'w' },
+                    周: { seconds: 604800, display: 'w' },
+                    m: { seconds: 2592000, display: 'm' },
+                    mo: { seconds: 2592000, display: 'm' },
+                    mon: { seconds: 2592000, display: 'm' },
+                    month: { seconds: 2592000, display: 'm' },
+                    months: { seconds: 2592000, display: 'm' },
+                    月: { seconds: 2592000, display: 'm' },
+                    y: { seconds: 31536000, display: 'y' },
+                    yr: { seconds: 31536000, display: 'y' },
+                    year: { seconds: 31536000, display: 'y' },
+                    years: { seconds: 31536000, display: 'y' },
+                    年: { seconds: 31536000, display: 'y' }
+                };
+                const mapped = unitMap[unit];
+                if (!mapped || !Number.isFinite(amount) || amount <= 0) {
+                    throw new Error('登录保持时间格式无效，示例：7d、14d、1m、12h、never');
+                }
+                const seconds = amount * mapped.seconds;
+                if (!Number.isFinite(seconds) || seconds > 315360000) {
+                    throw new Error('登录保持时间过长，请控制在 10 年以内');
+                }
+                return {
+                    seconds,
+                    display: `${amount}${mapped.display}`
+                };
+            },
+            getSavedLoginKeepDisplay() {
+                const saved = Storage.getLoginKeepValue();
+                try {
+                    return this.parseLoginKeepValue(saved).display;
+                } catch {
+                    Storage.setLoginKeepValue(DEFAULT_LOGIN_KEEP_VALUE);
+                    return DEFAULT_LOGIN_KEEP_VALUE;
+                }
+            },
+            renderLoginKeepStatus(display) {
+                document.getElementById('settingsLoginKeepStatus').textContent = `${I18n.auto('当前登录保持时间：')}${display}`;
+            },
+            syncLoginKeepPresetFromInput() {
+                const inputEl = document.getElementById('settingsLoginKeepInput');
+                const presetEl = document.getElementById('settingsLoginKeepPreset');
+                const rawValue = inputEl.value.trim();
+                if (!rawValue) {
+                    presetEl.value = 'custom';
+                    this.renderLoginKeepStatus(this.getSavedLoginKeepDisplay());
+                    return;
+                }
+                try {
+                    const parsed = this.parseLoginKeepValue(rawValue);
+                    presetEl.value = this.LOGIN_KEEP_PRESETS.includes(parsed.display) ? parsed.display : 'custom';
+                    this.renderLoginKeepStatus(parsed.display);
+                } catch {
+                    presetEl.value = 'custom';
+                    this.renderLoginKeepStatus(this.getSavedLoginKeepDisplay());
+                }
+            },
+            handleLoginKeepPresetChange(value) {
+                const inputEl = document.getElementById('settingsLoginKeepInput');
+                if (value !== 'custom') {
+                    inputEl.value = value;
+                }
+                this.syncLoginKeepPresetFromInput();
+            },
+            renderLoginKeepControls() {
+                const display = this.getSavedLoginKeepDisplay();
+                document.getElementById('settingsLoginKeepInput').value = display;
+                document.getElementById('settingsLoginKeepPreset').value = this.LOGIN_KEEP_PRESETS.includes(display) ? display : 'custom';
+                this.renderLoginKeepStatus(display);
             },
             renderLanguageGrid() {
                 const grid = document.getElementById('languageGrid');
@@ -4558,8 +4999,10 @@
             render() {
                 document.getElementById('settingsCurrentUser').textContent = State.username || '--';
                 document.getElementById('settingsNologinNotice').style.display = State.isNologin ? 'flex' : 'none';
+                document.getElementById('settingsLoginKeepNologinNotice').style.display = State.isNologin ? 'flex' : 'none';
                 document.getElementById('settingsPasswordForm').style.display = State.isNologin ? 'none' : '';
                 document.getElementById('settingsPrivateNetworkSection').style.display = State.isAdmin ? '' : 'none';
+                this.renderLoginKeepControls();
                 Theme.renderSchemeGrid();
                 this.renderLanguageGrid();
             },
@@ -4567,10 +5010,13 @@
                 document.getElementById('settingsNewPassword').value = '';
                 document.getElementById('settingsConfirmPassword').value = '';
                 document.getElementById('settingsChangePasswordBtn').disabled = false;
+                document.getElementById('settingsSaveLoginKeepBtn').disabled = false;
                 document.getElementById('settingsCurrentUser').textContent = '--';
                 document.getElementById('settingsNologinNotice').style.display = 'none';
+                document.getElementById('settingsLoginKeepNologinNotice').style.display = 'none';
                 document.getElementById('settingsPasswordForm').style.display = '';
                 document.getElementById('settingsPrivateNetworkSection').style.display = 'none';
+                this.renderLoginKeepControls();
             },
             openPrivateNetworks() {
                 if (!State.isAdmin) {
@@ -4608,6 +5054,44 @@
                 } finally {
                     btn.disabled = false;
                 }
+            },
+            async saveLoginKeep() {
+                let parsed = null;
+                try {
+                    parsed = this.parseLoginKeepValue(document.getElementById('settingsLoginKeepInput').value);
+                } catch (err) {
+                    Toast.error(err.message);
+                    return;
+                }
+
+                Storage.setLoginKeepValue(parsed.display);
+                this.renderLoginKeepControls();
+
+                if (!State.loggedIn || State.isNologin) {
+                    Toast.success(State.isNologin ? '登录保持时间已保存，当前免登录模式不会使用该设置' : '登录保持时间已保存，将在下次登录时生效');
+                    return;
+                }
+
+                const btn = document.getElementById('settingsSaveLoginKeepBtn');
+                btn.disabled = true;
+                try {
+                    const res = await apiFetch(`${Config.API}/api/auth/session`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ keepSeconds: parsed.seconds })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok) {
+                        Auth.setSession(data);
+                        Toast.success('登录保持时间已更新');
+                    } else {
+                        Toast.error(data.error || '登录保持时间更新失败');
+                    }
+                } catch (err) {
+                    Toast.error(`登录保持时间更新失败: ${err.message}`);
+                } finally {
+                    btn.disabled = false;
+                }
             }
         };
 
@@ -4628,7 +5112,6 @@
         const About = {
             init() {
                 this.render();
-                this.load();
             },
             async load() {
                 try {
@@ -4637,11 +5120,7 @@
                         return;
                     }
                     const data = await res.json();
-                    State.appVersion = data.version || State.appVersion;
-                    State.projectHomepage = data.projectHomepage || State.projectHomepage;
-                    State.showDesktopClientInfo = data.desktopNoLogin === true;
-                    State.desktopVersion = data.desktopVersion || '';
-                    State.desktopProjectHomepage = data.desktopProjectHomepage || State.desktopProjectHomepage;
+                    applyPublicAppInfo(data);
                     this.render();
                 } catch {}
             },
@@ -4671,6 +5150,8 @@
             }
         };
 
+        window.About = About;
+
         const Auth = {
             getToken() {
                 return State.token || Storage.getToken();
@@ -4685,15 +5166,17 @@
                 this._bootstrap();
             },
             async _bootstrap() {
+                let publicInfo = null;
                 try {
                     const res = await fetch(`${Config.API}/api/auth/nologin`);
                     if (res.ok) {
                         const data = await res.json();
+                        applyPublicAppInfo(data);
+                        publicInfo = data;
                         if (data && data.nologin) {
                             State.isNologin = true;
                             this.setSession(data);
-                            this.hideLogin();
-                            UI.showDashboard();
+                            UI.showDashboard({ showBootOverlay: false });
                             return;
                         }
                     }
@@ -4701,7 +5184,15 @@
 
                 const savedToken = Storage.getToken();
                 if (savedToken) {
+                    const savedFingerprint = Storage.getAuthSecretFingerprint();
+                    const currentFingerprint = (publicInfo && publicInfo.authSecretFingerprint) || State.authSecretFingerprint;
+                    if (savedFingerprint && currentFingerprint && savedFingerprint !== currentFingerprint) {
+                        this.clearSession();
+                        this.showLogin();
+                        return;
+                    }
                     State.token = savedToken;
+                    this.showLoading('正在恢复登录状态...', '正在验证本地保存的登录态，请稍候。');
                     this.verify();
                 } else {
                     this.showLogin();
@@ -4710,6 +5201,13 @@
             async login() {
                 const username = document.getElementById('loginUser').value.trim();
                 const password = document.getElementById('loginPass').value;
+                let keepSeconds = 0;
+                try {
+                    keepSeconds = Settings.parseLoginKeepValue(Storage.getLoginKeepValue()).seconds;
+                } catch {
+                    Storage.setLoginKeepValue(DEFAULT_LOGIN_KEEP_VALUE);
+                    keepSeconds = Settings.parseLoginKeepValue(DEFAULT_LOGIN_KEEP_VALUE).seconds;
+                }
                 if (!username || !password) {
                     this.showError('请输入用户名和密码');
                     return;
@@ -4719,13 +5217,13 @@
                     const res = await fetch(`${Config.API}/api/auth/login`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password })
+                        body: JSON.stringify({ username, password, keepSeconds })
                     });
                     const data = await res.json();
                     if (res.ok) {
                         this.setSession(data);
                         document.getElementById('loginPass').value = '';
-                        this.hideLogin();
+                        this.showLoading('正在启动工作台...', '先载入界面，再分阶段连接服务模块。');
                         UI.showDashboard();
                     } else {
                         this.showError(data.error || '登录失败');
@@ -4740,7 +5238,7 @@
                     if (res.ok) {
                         const data = await res.json();
                         this.setSession({ token: State.token, ...data });
-                        this.hideLogin();
+                        this.showLoading('正在启动工作台...', '先载入界面，再分阶段连接服务模块。');
                         UI.showDashboard();
                         return;
                     }
@@ -4748,14 +5246,22 @@
                 this.clearSession();
                 this.showLogin();
             },
-            setSession({ token, username, role }) {
+            setSession(session = {}) {
+                const { token, username, role, keepSeconds } = session;
                 if (token) {
                     State.token = token;
                     Storage.setToken(token);
                 }
+                applyPublicAppInfo(session);
                 State.loggedIn = true;
                 State.username = username || State.username;
                 State.isAdmin = role === 'admin';
+                if (State.authSecretFingerprint) {
+                    Storage.setAuthSecretFingerprint(State.authSecretFingerprint);
+                }
+                if (Number.isFinite(Number(keepSeconds))) {
+                    Storage.setLoginKeepValue(Number(keepSeconds) === 0 ? 'never' : Storage.getLoginKeepValue());
+                }
             },
             clearSession() {
                 State.loggedIn = false;
@@ -4767,9 +5273,11 @@
                 State.navHistory = [];
                 State.navIndex = -1;
                 State.selectedFiles = [];
+                State.authSecretFingerprint = '';
                 setEditingHostIndex(null);
                 Settings.reset();
                 Storage.clearToken();
+                Storage.clearAuthSecretFingerprint();
                 UI.resetConnections();
                 UI.hideDashboard();
             },
@@ -4787,11 +5295,37 @@
             },
             showLogin() {
                 document.getElementById('authOverlay').classList.remove('hidden');
+                document.getElementById('authLoginPanel').classList.remove('hidden');
+                document.getElementById('authLoadingPanel').classList.add('hidden');
                 document.getElementById('loginPass').value = '';
+                this.updateLoadingProgress(0, '正在准备界面...');
+                this.showError('');
                 document.getElementById('loginUser').focus();
+            },
+            showLoading(title = '正在恢复登录状态...', sub = '正在验证本地保存的登录态，请稍候。') {
+                document.getElementById('authOverlay').classList.remove('hidden');
+                document.getElementById('authLoginPanel').classList.add('hidden');
+                document.getElementById('authLoadingPanel').classList.remove('hidden');
+                document.getElementById('authLoadingTitle').textContent = I18n.auto(title);
+                document.getElementById('authLoadingSub').textContent = I18n.auto(sub);
+                this.updateLoadingProgress(0, '正在准备界面...');
+                this.showError('');
+            },
+            updateLoadingProgress(progress = 0, stage = '') {
+                const safeProgress = Math.max(0, Math.min(1, Number(progress) || 0));
+                const fill = document.getElementById('authProgressFill');
+                const value = document.getElementById('authProgressValue');
+                const label = document.getElementById('authProgressStage');
+                fill.style.width = `${Math.round(safeProgress * 100)}%`;
+                value.textContent = `${Math.round(safeProgress * 100)}%`;
+                if (stage) {
+                    label.textContent = I18n.auto(stage);
+                }
             },
             hideLogin() {
                 document.getElementById('authOverlay').classList.add('hidden');
+                document.getElementById('authLoginPanel').classList.remove('hidden');
+                document.getElementById('authLoadingPanel').classList.add('hidden');
                 this.showError('');
             },
             showError(msg) {
@@ -9966,6 +10500,10 @@
 
         // UI
         const UI = {
+            started: false,
+            bootRunId: 0,
+            bootProgressFrame: 0,
+            bootProgressState: null,
             init() {
                 I18n.init();
                 About.init();
@@ -10133,27 +10671,163 @@
                 });
 
             },
-            showDashboard() {
-                document.getElementById('dashboard').classList.add('visible');
-                this.applyRole();
-                Settings.render();
-                if (!this.started) {
-                    this.started = true;
-                    Terminal_.init();
-                    Serial.init();
-                    FlashDebug.init();
-                    VNCModule.init();
+            stopBootProgressLoop() {
+                if (this.bootProgressFrame) {
+                    cancelAnimationFrame(this.bootProgressFrame);
+                    this.bootProgressFrame = 0;
                 }
+                this.bootProgressState = null;
+            },
+            pause(ms) {
+                return new Promise((resolve) => setTimeout(resolve, ms));
+            },
+            nextFrame() {
+                return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+            },
+            renderBootProgress(state) {
+                if (!state || state.showBootOverlay !== true) return;
+                const elapsed = performance.now() - state.startedAt;
+                const fakeProgress = state.minDurationMs > 0
+                    ? Math.min(0.96, 0.08 + (elapsed / state.minDurationMs) * 0.88)
+                    : state.actualProgress;
+                const displayProgress = state.done
+                    ? 1
+                    : Math.min(0.97, Math.max(state.actualProgress, fakeProgress));
+                Auth.updateLoadingProgress(displayProgress, state.stage);
+            },
+            startBootProgressLoop(state) {
+                if (!state || state.showBootOverlay !== true) return;
+                this.stopBootProgressLoop();
+                this.bootProgressState = state;
+                const tick = () => {
+                    if (this.bootProgressState !== state || this.bootRunId !== state.runId) {
+                        return;
+                    }
+                    this.renderBootProgress(state);
+                    this.bootProgressFrame = requestAnimationFrame(tick);
+                };
+                tick();
+            },
+            async startDashboardBoot(runId, options = {}) {
+                const showBootOverlay = options.showBootOverlay !== false;
+                const bootState = showBootOverlay ? {
+                    runId,
+                    showBootOverlay,
+                    startedAt: performance.now(),
+                    minDurationMs: 3000,
+                    actualProgress: 0.06,
+                    stage: '正在准备界面...',
+                    done: false
+                } : null;
+
+                if (showBootOverlay) {
+                    Auth.showLoading(
+                        options.bootTitle || '正在启动工作台...',
+                        options.bootSubtitle || '先载入界面，再分阶段连接服务模块。'
+                    );
+                    this.startBootProgressLoop(bootState);
+                } else {
+                    Auth.hideLogin();
+                }
+
+                const updateStage = (progress, stage) => {
+                    if (this.bootRunId !== runId) {
+                        return false;
+                    }
+                    if (bootState) {
+                        bootState.actualProgress = Math.max(bootState.actualProgress, Math.max(0, Math.min(1, progress)));
+                        if (stage) {
+                            bootState.stage = stage;
+                        }
+                        this.renderBootProgress(bootState);
+                    }
+                    return true;
+                };
+
+                const runStage = async (progress, stage, task = null) => {
+                    if (!updateStage(progress, stage)) {
+                        return false;
+                    }
+                    await this.nextFrame();
+                    if (typeof task === 'function') {
+                        try {
+                            await task();
+                        } catch (err) {
+                            console.error(`[UI Boot] ${stage} 失败:`, err);
+                        }
+                    }
+                    await this.nextFrame();
+                    return this.bootRunId === runId;
+                };
+
+                if (!await runStage(0.14, '正在渲染工作台...')) return;
+
+                if (!this.started) {
+                    if (!await runStage(0.36, '正在初始化终端模块...', async () => {
+                        Terminal_.init();
+                    })) return;
+                    if (!await runStage(0.58, '正在初始化串口与远程桌面模块...', async () => {
+                        Serial.init();
+                        FlashDebug.init();
+                        VNCModule.init();
+                    })) return;
+                    this.started = true;
+                } else {
+                    if (!await runStage(0.58, '正在初始化终端模块...')) return;
+                }
+
                 if (FlashDebug.initialized) {
                     FlashDebug.applyAccessState();
                 }
+
                 if (State.isAdmin) {
-                    LocalShell.init();
-                    Security.load();
+                    if (!await runStage(0.72, '正在同步本机终端能力...', async () => {
+                        await LocalShell.init();
+                    })) return;
                 }
-                Hosts.load();
+
+                if (!await runStage(0.86, '正在加载主机列表...', async () => {
+                    await Hosts.load();
+                })) return;
+
+                if (State.isAdmin) {
+                    if (!await runStage(0.94, '正在加载安全设置...', async () => {
+                        await Security.load();
+                    })) return;
+                }
+
+                if (!bootState) return;
+
+                const remaining = Math.max(0, bootState.minDurationMs - (performance.now() - bootState.startedAt));
+                if (remaining > 0) {
+                    await this.pause(remaining);
+                }
+                if (this.bootRunId !== runId) {
+                    return;
+                }
+                bootState.done = true;
+                bootState.actualProgress = 1;
+                bootState.stage = '启动完成';
+                this.renderBootProgress(bootState);
+                await this.pause(180);
+                if (this.bootRunId !== runId) {
+                    return;
+                }
+                this.stopBootProgressLoop();
+                Auth.hideLogin();
+            },
+            showDashboard(options = {}) {
+                const runId = ++this.bootRunId;
+                this.stopBootProgressLoop();
+                document.getElementById('dashboard').classList.add('visible');
+                this.applyRole();
+                About.render();
+                Settings.render();
+                void this.startDashboardBoot(runId, options);
             },
             hideDashboard() {
+                this.bootRunId += 1;
+                this.stopBootProgressLoop();
                 document.getElementById('dashboard').classList.remove('visible');
             },
             resetConnections() {

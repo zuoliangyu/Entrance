@@ -14,6 +14,9 @@ Documentation is English-first: keep the root `README.md` as the default English
 # Install dependencies
 npm install
 
+# Rebuild generated frontend assets from webui-src/
+npm run build:webui
+
 # Start the development server
 npm start
 # or
@@ -40,13 +43,17 @@ PORT=4000 docker compose up -d --build
 - `AUTH_SECRET` (required) - Auth token signing key; must decode to at least 32 bytes.
 - `SSH_PASSWORD_KEY` (optional) - 32-byte AES key for stored SSH credentials and private-network allowlists; if omitted, the server writes a generated key to `.ssh_password_key` under `ENTRANCE_DATA_DIR`.
 - `PORT` - HTTP port, defaults to `3000`; can also be overridden by the `--port` / `-p` startup flag.
+- `ENTRANCE_HOST` - Explicit bind host override. Defaults to `0.0.0.0` in web mode and `127.0.0.1` in desktop API-only mode.
 - `ENTRANCE_DATA_DIR` - Runtime data directory for `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, `LOGIN_KEEP`, and `.ssh_password_key`. Do not upload or commit this directory, `.data/`, or any other user/runtime data directories.
 - `AUTH_TOKEN_TTL` - Default password-login token lifetime in seconds, defaults to `604800` and can be overridden from the in-app Settings keepalive control.
 - `LOGIN_WINDOW_MS` / `LOGIN_MAX_ATTEMPTS` - Login rate-limit window and failure threshold.
 - `STRICT_HOST_KEY_CHECKING` - When `true`, reject unknown SSH host keys instead of learning them.
 - `ALLOWED_TARGETS` - Comma-separated allowlist for SSH/VNC target hosts; supports exact names and `*.example.com` patterns.
 - `ALLOW_PRIVATE_NETWORKS` - When `true`, skip the admin-managed private CIDR whitelist check.
-- `ENTRANCE_DESKTOP_NOLOGIN` - When set to `1`, bypass login and auto-authenticate as `admin`.
+- `ENTRANCE_DESKTOP_NOLOGIN` - When set to `1`, enable desktop no-login mode. Use it with the API-only bootstrap flow for secure Electron deployments.
+- `ENTRANCE_DESKTOP_API_ONLY` - When set to `1`, disable static WebUI serving and expose backend APIs only.
+- `ENTRANCE_DESKTOP_ALLOWED_ORIGIN` - Allowed renderer origin for desktop API-only CORS, defaults to `app://entrance`.
+- `ENTRANCE_DESKTOP_BOOTSTRAP_SECRET` - Required when both `ENTRANCE_DESKTOP_API_ONLY=1` and `ENTRANCE_DESKTOP_NOLOGIN=1`; used by the desktop wrapper to obtain the admin no-login token securely.
 
 ## Architecture Overview
 
@@ -57,9 +64,16 @@ PORT=4000 docker compose up -d --build
 ├── compose.yml         # Docker Compose service definition
 ├── Dockerfile          # Container image build
 ├── public/
-│   ├── index.html      # Single-page frontend (HTML + CSS + JavaScript)
+│   ├── assets/         # Generated frontend CSS/JS assets
+│   ├── index.html      # Generated frontend entrypoint
 │   ├── logo.png        # Startup splash logo shown inside the rounded loading card
 │   └── vnc-client.js   # VNC browser client
+├── webui-src/
+│   ├── index.template.html  # Frontend template entrypoint
+│   ├── partials/            # HTML fragments for each view/modal/layout section
+│   ├── scripts/app.js       # Frontend application logic source
+│   └── styles/app.css       # Frontend stylesheet source
+├── scripts/build-webui.js  # Regenerates public/index.html and public/assets/*
 ├── server.js           # Express backend server (HTTP + WebSocket + auth + SSH/SFTP/Docker)
 ├── local-shell.js      # Local shell module (Linux/macOS via script, Windows via direct shell spawn)
 ├── flash-debug.js      # Admin-only local flash/debug module (OpenOCD / pyOCD / probe-rs + optional elevation)
@@ -74,7 +88,8 @@ PORT=4000 docker compose up -d --build
 ```
 
 ### Frontend Architecture
-- Single-file HTML app with no build step
+- Editable frontend source lives in `webui-src/`; generated output lives in `public/`
+- `scripts/build-webui.js` resolves `{{> ...}}` partial includes and copies `webui-src/styles/app.css` and `webui-src/scripts/app.js` into `public/assets/`
 - Modular JavaScript objects: `State`, `Storage`, `Theme`, `Settings`, `I18n`, `Toast`, `Terminal_`, `FlashDebug`, `SFTP`, `Hosts`, `UI`
 - CSS variables for theme switching and Material You color scheme support (`data-color-scheme` attribute)
 - UI i18n support with English as the default language and Simplified Chinese as the secondary option
@@ -83,6 +98,7 @@ PORT=4000 docker compose up -d --build
   - When a saved login is being restored and `ENTRANCE_DESKTOP_NOLOGIN` is not enabled, show a Material You wave splash with `public/logo.png` clipped into a rounded rectangle
   - Keep a minimum 3-second progress animation even if backend verification is fast
   - Render the dashboard shell first, then initialize backend-backed modules in stages
+  - In secure desktop no-login mode, the Electron wrapper should own the bootstrap, call `POST /api/auth/desktop/bootstrap`, and inject auth into API/WebSocket requests without exposing the token to the renderer
 - `FlashDebug` now uses a shared autocomplete pipeline for tool-specific target inputs:
   - OpenOCD target configs and interface configs
   - pyOCD target names from `pyocd list --targets --no-header`
@@ -93,7 +109,7 @@ PORT=4000 docker compose up -d --build
 - Express.js HTTP/REST API server
 - WebSocket upgrade handling for SSH, VNC, admin-only local shell sessions, and admin-only flash/debug sessions
 - ssh2 library for SSH/SFTP functionality
-- Auth/token system in `server.js` (signed bearer tokens, login throttling, encrypted `LOGIN_KEEP`, `AUTH_SECRET` fingerprint checks, optional no-login mode)
+- Auth/token system in `server.js` (signed bearer tokens, login throttling, encrypted `LOGIN_KEEP`, `AUTH_SECRET` fingerprint checks, browser login flows, and desktop API-only bootstrap mode)
 - Private target validation via allowlists, private-network CIDR management, and known-host verification
 - File storage for user data, known hosts, and encrypted secrets
 - `flash-debug.js` wraps OpenOCD, pyOCD, and probe-rs, including optional OS-level privilege elevation requests
@@ -141,7 +157,7 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
 
 ### Adding Features
 1. Backend API: add routes in `server.js`
-2. Frontend features: add logic in the relevant module inside `index.html`
+2. Frontend features: change `webui-src/scripts/app.js`, `webui-src/styles/app.css`, or the relevant `webui-src/partials/*.html` file, then regenerate `public/` with `npm run build:webui`
 3. Testing: run `npm start` and test locally
 
 ### Code Style
@@ -165,6 +181,7 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
 - `LOGIN_KEEP` stores the last successful password-login Unix timestamp encrypted with AES-256-GCM using a key derived from `AUTH_SECRET`.
 - Stored SSH credentials and private-network allowlist entries are AES-256-GCM encrypted with `SSH_PASSWORD_KEY`.
 - If `SSH_PASSWORD_KEY` changes, existing encrypted secrets become unreadable until the old key is restored or the values are re-entered.
+- Desktop no-login should not expose `/api/auth/nologin` to browsers. Use `ENTRANCE_DESKTOP_API_ONLY=1`, loopback binding, and the `POST /api/auth/desktop/bootstrap` + `X-Entrance-Desktop-Secret` flow instead.
 - SFTP sessions are stored in memory (Map).
 - User data is isolated per user in separate JSON files under `ENTRANCE_DATA_DIR`.
 - Never upload or commit `.data/`, `ENTRANCE_DATA_DIR` contents, `userdata/`, generated runtime JSON, or any other user data snapshots.

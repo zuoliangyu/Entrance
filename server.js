@@ -54,8 +54,15 @@ function parseStartupPort(argv = [], envPort = process.env.PORT) {
     return parsedPort;
 }
 
+function parseStartupHost(envHost = process.env.ENTRANCE_HOST, fallback = '0.0.0.0') {
+    const rawHost = String(envHost || '').trim();
+    return rawHost || fallback;
+}
+
 // 配置
 const PORT = parseStartupPort(process.argv.slice(2), process.env.PORT);
+const DESKTOP_API_ONLY = process.env.ENTRANCE_DESKTOP_API_ONLY === '1';
+const HOST = parseStartupHost(process.env.ENTRANCE_HOST, DESKTOP_API_ONLY ? '127.0.0.1' : '0.0.0.0');
 const DATA_DIR = path.resolve(process.env.ENTRANCE_DATA_DIR || __dirname);
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
@@ -73,6 +80,8 @@ const DEFAULT_LOGIN_KEEP_SECONDS = Number.isFinite(AUTH_TOKEN_TTL) && AUTH_TOKEN
 const MAX_LOGIN_KEEP_SECONDS = 10 * 365 * 24 * 60 * 60;
 const DESKTOP_NOLOGIN = process.env.ENTRANCE_DESKTOP_NOLOGIN === '1';
 const DESKTOP_VERSION = String(process.env.ENTRANCE_DESKTOP_VERSION || '').trim();
+const DESKTOP_ALLOWED_ORIGIN = String(process.env.ENTRANCE_DESKTOP_ALLOWED_ORIGIN || 'app://entrance').trim() || 'app://entrance';
+const DESKTOP_BOOTSTRAP_SECRET = String(process.env.ENTRANCE_DESKTOP_BOOTSTRAP_SECRET || '').trim();
 const PROJECT_HOMEPAGE = 'https://github.com/fcanlnony/Entrance';
 const DESKTOP_PROJECT_HOMEPAGE = 'https://github.com/EntranceToolBox/Entrance-Desktop';
 const STRICT_HOST_KEY_CHECKING = process.env.STRICT_HOST_KEY_CHECKING === 'true';
@@ -416,11 +425,21 @@ function getNoLoginPayload() {
     return DESKTOP_NOLOGIN ? { sub: 'admin', role: 'admin' } : null;
 }
 
+function timingSafeEqualText(left, right) {
+    const leftBuffer = Buffer.from(String(left || ''), 'utf8');
+    const rightBuffer = Buffer.from(String(right || ''), 'utf8');
+    if (!leftBuffer.length || leftBuffer.length !== rightBuffer.length) {
+        return false;
+    }
+    return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
 function getPublicAppInfo() {
     const info = {
         version: APP_VERSION,
         projectHomepage: PROJECT_HOMEPAGE,
         desktopNoLogin: DESKTOP_NOLOGIN,
+        desktopApiOnly: DESKTOP_API_ONLY,
         authSecretFingerprint: getAuthSecretFingerprint(),
         defaultLoginKeepSeconds: DEFAULT_LOGIN_KEEP_SECONDS
     };
@@ -432,7 +451,11 @@ function getPublicAppInfo() {
 }
 
 function resolveAuth(token) {
-    return (token ? verifyToken(token) : null) || getNoLoginPayload();
+    const verified = token ? verifyToken(token) : null;
+    if (verified) {
+        return verified;
+    }
+    return DESKTOP_API_ONLY ? null : getNoLoginPayload();
 }
 
 const loginAttempts = new Map();
@@ -1046,17 +1069,20 @@ const upload = multer({
 
 // 中间件
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+if (!DESKTOP_API_ONLY) {
+    app.use(express.static(path.join(__dirname, 'public')));
+}
 
 // CORS 支持
 const corsOriginPattern = /^(https?:\/\/)(localhost|127\.0\.0\.1)(:\d+)?$/;
 app.use((req, res, next) => {
     const { origin } = req.headers;
-    if (origin && corsOriginPattern.test(origin)) {
+    const originAllowed = !origin || (DESKTOP_API_ONLY ? origin === DESKTOP_ALLOWED_ORIGIN : corsOriginPattern.test(origin));
+    if (origin && originAllowed) {
         res.header('Access-Control-Allow-Origin', origin);
         res.header('Vary', 'Origin');
         res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Entrance-Desktop-Secret');
     } else if (origin) {
         if (req.method === 'OPTIONS') {
             return res.sendStatus(403);
@@ -1118,6 +1144,9 @@ app.post('/api/auth/login', async (req, res) => {
 
 // 免登录模式检查
 app.get('/api/auth/nologin', (req, res) => {
+    if (DESKTOP_API_ONLY) {
+        return res.json({ nologin: false, ...getPublicAppInfo() });
+    }
     const payload = getNoLoginPayload();
     if (!payload) {
         return res.json({ nologin: false, ...getPublicAppInfo() });
@@ -1131,6 +1160,29 @@ app.get('/api/auth/nologin', (req, res) => {
     });
 });
 
+app.post('/api/auth/desktop/bootstrap', (req, res) => {
+    if (!DESKTOP_API_ONLY || !DESKTOP_BOOTSTRAP_SECRET) {
+        return res.status(404).json({ success: false, error: '桌面引导不可用' });
+    }
+    if (!DESKTOP_NOLOGIN) {
+        return res.status(409).json({ success: false, error: '当前未启用桌面免登录' });
+    }
+    const providedSecret = String(req.headers['x-entrance-desktop-secret'] || '').trim();
+    if (!timingSafeEqualText(providedSecret, DESKTOP_BOOTSTRAP_SECRET)) {
+        return res.status(403).json({ success: false, error: '桌面引导鉴权失败' });
+    }
+
+    const payload = getNoLoginPayload();
+    if (!payload) {
+        return res.status(409).json({ success: false, error: '当前未启用桌面免登录' });
+    }
+
+    res.json({
+        ...buildAuthSuccessResponse(payload, AUTH_TOKEN_TTL),
+        nologin: true
+    });
+});
+
 app.get('/api/app-info', (req, res) => {
     res.json(getPublicAppInfo());
 });
@@ -1141,6 +1193,7 @@ app.post('/api/auth/verify', requireAuth, (req, res) => {
         success: true,
         username: req.auth.sub,
         role: req.auth.role,
+        nologin: DESKTOP_NOLOGIN && req.auth.sub === 'admin' && req.auth.role === 'admin',
         loginKeepTimestamp: readLoginKeepTimestamp(),
         ...getPublicAppInfo()
     });
@@ -2300,14 +2353,18 @@ server.on('upgrade', (request, socket, head) => {
 async function bootstrap() {
     getAuthSecret();
     getSshPasswordKey();
+    if (DESKTOP_API_ONLY && DESKTOP_NOLOGIN && !DESKTOP_BOOTSTRAP_SECRET) {
+        throw new Error('ENTRANCE_DESKTOP_BOOTSTRAP_SECRET is required when ENTRANCE_DESKTOP_API_ONLY=1 and ENTRANCE_DESKTOP_NOLOGIN=1');
+    }
     await UserManager.ensureDefaults();
-    server.listen(PORT, () => {
+    server.listen(PORT, HOST, () => {
+        const displayHost = HOST === '0.0.0.0' ? 'localhost' : HOST === '::' ? '[::1]' : HOST;
         console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║   Server Management Dashboard                             ║
 ║                                                           ║
-║   服务器运行在: http://localhost:${PORT}                     ║
+║   服务器运行在: http://${displayHost}:${PORT}                     ║
 ║                                                           ║
 ║   功能:                                                   ║
 ║   - SSH 终端 (WebSocket)                                  ║

@@ -1,0 +1,67 @@
+            <div class="view" id="view-shell">
+                <div class="header"><h2><i class="fas fa-laptop-code"></i> Web 终端</h2></div>
+                <div class="content">
+                    <div id="shellNotAvailable" style="display:none;padding:20px;background:var(--color-bg-2);border-radius:8px;margin-bottom:20px">
+                        <p style="color:var(--color-warning);margin-bottom:8px"><i class="fas fa-exclamation-triangle"></i> 终端服务不可用</p>
+                        <p id="shellNotAvailableReason" style="color:var(--color-text-2);font-size:13px">当前服务器平台暂不支持终端功能</p>
+                    </div>
+                    <div id="shellModeNote" style="display:none;padding:14px 16px;background:var(--color-bg-1);border:1px solid var(--color-border);border-radius:8px;margin-bottom:20px;color:var(--color-text-2);font-size:13px;line-height:1.6"></div>
+                    <div class="toolbar" id="shellSshConfig" style="display:none">
+                        <div class="input-group">
+                            <label>目标主机</label>
+                            <input type="text" class="form-input" id="shellHost" value="127.0.0.1" readonly>
+                        </div>
+                        <div class="input-group">
+                            <label>端口</label>
+                            <input type="number" class="form-input" id="shellPort" value="22" min="1" max="65535" style="width:90px">
+                        </div>
+                        <div class="input-group">
+                            <label>用户名</label>
+                            <input type="text" class="form-input" id="shellUser" placeholder="Windows 用户名" maxlength="128">
+                        </div>
+                        <div class="input-group">
+                            <label>认证方式</label>
+                            <select class="form-input" id="shellAuthType">
+                                <option value="password" selected>密码</option>
+                                <option value="key">私钥</option>
+                            </select>
+                        </div>
+                        <div class="input-group" id="shellPasswordGroup">
+                            <label>密码</label>
+                            <input type="password" class="form-input" id="shellPass" placeholder="Windows 登录密码" maxlength="2048">
+                        </div>
+                        <div class="auth-key-panel" id="shellKeyPanel">
+                            <div class="input-group key-input-group">
+                                <label>私钥</label>
+                                <textarea class="form-input key-input" id="shellPrivateKey" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" maxlength="65536" spellcheck="false"></textarea>
+                            </div>
+                            <div class="input-group">
+                                <label>私钥口令（可选）</label>
+                                <input type="password" class="form-input" id="shellPassphrase" placeholder="私钥口令" maxlength="4096">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sftp-status disconnected" id="shellStatus">
+                        <div class="status-dot"></div>
+                        <span class="sftp-status-text" id="shellStatusText">未启动</span>
+                        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+                            <span id="shellInfo" style="font-size:12px;color:var(--color-text-3)"></span>
+                        </div>
+                        <select id="shellPathInput" style="width:200px;padding:6px 10px;border:1px solid var(--color-border);border-radius:4px;background:var(--color-bg-2);color:var(--color-text-1);font-size:13px">
+                        </select>
+                        <button class="btn btn-success btn-sm" id="shellStartBtn"><i class="fas fa-play"></i> 启动</button>
+                        <button class="btn btn-danger btn-sm" id="shellStopBtn" style="display:none"><i class="fas fa-stop"></i> 停止</button>
+                    </div>
+                    <div class="terminal-box">
+                        <div class="terminal-header">
+                            <span class="terminal-title" id="shellTermTitle">Web 终端 - 未启动</span>
+                            <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+                                <button class="btn btn-sm btn-secondary" id="shellClearBtn"><i class="fas fa-eraser"></i> 清屏</button>
+                            </div>
+                        </div>
+                        <div class="terminal-screen" id="shellTerminal"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SFTP -->

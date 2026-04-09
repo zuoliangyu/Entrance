@@ -151,6 +151,8 @@ npm install
 npm start
 ```
 
+`npm start` now rebuilds the modular WebUI from `webui-src/` before launching the server. Use `npm run build:webui` if you only want to refresh the generated frontend assets.
+
 Visit http://localhost:3000 and sign in to enter the dashboard.
 
 To use a different port, use an environment variable or CLI flag:
@@ -256,6 +258,7 @@ podman run -d --name entrance-tools \
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP listening port; can also be overridden with `npm start -- --port 4000` |
+| `ENTRANCE_HOST` | `0.0.0.0` in web mode, `127.0.0.1` in desktop API-only mode | Explicit bind host override |
 | `ENTRANCE_DATA_DIR` | repository root | Persistent data directory containing `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, `.ssh_password_key`, and `LOGIN_KEEP` |
 | `AUTH_SECRET` | none, required | Signing key for auth tokens; must be at least 32 bytes (base64 or 64 hex chars) |
 | `SSH_PASSWORD_KEY` | auto-generates `.ssh_password_key` when unset | 32-byte key used to encrypt SSH/SFTP credentials and the private network allowlist; if set manually, it must remain stable across restarts |
@@ -265,7 +268,10 @@ podman run -d --name entrance-tools \
 | `STRICT_HOST_KEY_CHECKING` | `false` | When `true`, reject unknown SSH host keys |
 | `ALLOWED_TARGETS` | empty | Comma-separated allowlist of target hosts, supports `*.example.com` |
 | `ALLOW_PRIVATE_NETWORKS` | `false` | When `true`, allow direct private-address access; otherwise admin allowlisting is required |
-| `ENTRANCE_DESKTOP_NOLOGIN` | `0` | When `1`, skip login and access the app directly as `admin`; recommended only in trusted environments |
+| `ENTRANCE_DESKTOP_NOLOGIN` | `0` | When `1`, enable desktop no-login. For a secure Electron deployment, pair it with `ENTRANCE_DESKTOP_API_ONLY=1` and a bootstrap secret instead of exposing the web UI |
+| `ENTRANCE_DESKTOP_API_ONLY` | `0` | When `1`, disable static WebUI serving and expose backend APIs only; intended for Electron wrappers that render local frontend assets |
+| `ENTRANCE_DESKTOP_ALLOWED_ORIGIN` | `app://entrance` | Allowed renderer origin for CORS when `ENTRANCE_DESKTOP_API_ONLY=1` |
+| `ENTRANCE_DESKTOP_BOOTSTRAP_SECRET` | empty | Required when `ENTRANCE_DESKTOP_API_ONLY=1` and `ENTRANCE_DESKTOP_NOLOGIN=1`; lets the desktop wrapper obtain the no-login admin token without exposing `/api/auth/nologin` to browsers |
 
 ## Project Structure
 
@@ -274,8 +280,14 @@ podman run -d --name entrance-tools \
 ├── compose.yml          # Docker Compose configuration
 ├── Dockerfile           # Docker image build file
 ├── public/              # Frontend static assets
-│   ├── index.html
+│   ├── assets/          # Generated CSS/JS bundles built from webui-src/
+│   ├── index.html       # Generated frontend entrypoint
 │   └── vnc-client.js
+├── webui-src/           # Editable WebUI source files and HTML partials
+│   ├── index.template.html
+│   ├── partials/
+│   ├── scripts/app.js
+│   └── styles/app.css
 ├── server.js            # Backend server
 ├── local-shell.js       # Cross-platform local shell module
 ├── flash-debug.js       # Local flash/debug module (OpenOCD / pyOCD / probe-rs)
@@ -625,13 +637,14 @@ memory:[used:8192, free:4096, cached:2048]
 
 ## Security Notes
 
-- Login is enabled by default. Auth tokens are signed with `AUTH_SECRET`; login is skipped only when `ENTRANCE_DESKTOP_NOLOGIN=1`.
+- Login is enabled by default. Auth tokens are signed with `AUTH_SECRET`. If you enable desktop no-login, do it through `ENTRANCE_DESKTOP_API_ONLY=1` plus `ENTRANCE_DESKTOP_BOOTSTRAP_SECRET` so browsers cannot obtain the admin token from `/api/auth/nologin`.
 - Password-login keepalive defaults to 7 days and can be changed from Settings. The current preference is stored in browser local storage and can be refreshed immediately for the active session.
 - The browser keeps the saved login only while token verification succeeds and the current `AUTH_SECRET` fingerprint matches the one recorded for that session.
 - Passwords in `users.json` are stored as `Argon2id` hashes. Legacy plaintext passwords are migrated automatically after a successful login.
 - The last successful password-login timestamp is stored in `ENTRANCE_DATA_DIR/LOGIN_KEEP` and encrypted with AES-256-GCM using a key derived from `AUTH_SECRET`.
 - SSH/SFTP credentials, including passwords, private keys, and passphrases, are stored only in the browser or in server-side user data; when persisted, they are encrypted with AES-256-GCM using `SSH_PASSWORD_KEY`.
 - The private network allowlist is stored in `private-networks.json` and encrypted with AES-256-GCM using `SSH_PASSWORD_KEY`.
+- In desktop API-only mode the backend stops serving `public/index.html`, binds to loopback by default, and only exposes the admin no-login bootstrap through `POST /api/auth/desktop/bootstrap` with `X-Entrance-Desktop-Secret`.
 - If `SSH_PASSWORD_KEY` changes, historical encrypted credentials and allowlist entries become unreadable until the old key is restored or the data is re-entered.
 - **Local Shell Security** (Linux/macOS/Windows, admin only): local shell access gives direct terminal access to the server. Make sure to:
   - use it only on trusted networks

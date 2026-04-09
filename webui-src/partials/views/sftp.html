@@ -1,0 +1,90 @@
+            <div class="view" id="view-sftp">
+                <div class="header"><h2><i class="fas fa-folder-tree"></i> SFTP 管理</h2></div>
+                <div class="content">
+                    <div class="toolbar">
+                        <div class="input-group">
+                            <label>主机地址</label>
+                            <input type="text" class="form-input" id="sftpHost" placeholder="192.168.1.100">
+                        </div>
+                        <div class="input-group">
+                            <label>端口</label>
+                            <input type="number" class="form-input" id="sftpPort" value="22" style="width:70px">
+                        </div>
+                        <div class="input-group">
+                            <label>用户名</label>
+                            <input type="text" class="form-input" id="sftpUser" placeholder="root">
+                        </div>
+                        <div class="input-group">
+                            <label>认证方式</label>
+                            <select class="form-input" id="sftpAuthType">
+                                <option value="password" selected>密码</option>
+                                <option value="key">私钥</option>
+                            </select>
+                        </div>
+                        <div class="input-group" id="sftpPasswordGroup">
+                            <label>密码</label>
+                            <input type="password" class="form-input" id="sftpPass" placeholder="密码" maxlength="2048">
+                        </div>
+                        <div class="auth-key-panel" id="sftpKeyPanel">
+                            <div class="input-group key-input-group">
+                                <label>私钥</label>
+                                <textarea class="form-input key-input" id="sftpPrivateKey" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" maxlength="65536" spellcheck="false"></textarea>
+                            </div>
+                            <div class="input-group">
+                                <label>私钥口令（可选）</label>
+                                <input type="password" class="form-input" id="sftpPassphrase" placeholder="私钥口令" maxlength="4096">
+                            </div>
+                        </div>
+                        <div class="input-group" style="justify-content:flex-end">
+                            <label>&nbsp;</label>
+                            <button class="btn btn-success" id="sftpConnectBtn"><i class="fas fa-plug"></i> 连接</button>
+                        </div>
+                    </div>
+                    <div class="sftp-status disconnected" id="sftpStatus">
+                        <div class="status-dot"></div>
+                        <span class="sftp-status-text" id="sftpStatusText">未连接</span>
+                        <button class="btn btn-danger btn-sm" id="sftpDisconnectBtn" style="display:none"><i class="fas fa-times"></i> 断开</button>
+                    </div>
+                    <div class="file-pane">
+                        <div class="file-pane-header">
+                            <h3><i class="fas fa-server"></i> 远程文件</h3>
+                            <div class="file-pane-actions">
+                                <button class="btn btn-sm btn-secondary" id="sftpRefreshBtn" disabled><i class="fas fa-sync-alt"></i> 刷新</button>
+                                <button class="btn btn-sm btn-secondary" id="sftpMkdirBtn" disabled><i class="fas fa-folder-plus"></i> 新建</button>
+                                <button class="btn btn-sm btn-success" id="sftpDownloadBtn" disabled><i class="fas fa-download"></i> 下载</button>
+                                <button class="btn btn-sm btn-danger" id="sftpDeleteBtn" disabled><i class="fas fa-trash"></i> 删除</button>
+                            </div>
+                        </div>
+                        <div class="file-path">
+                            <button class="file-path-btn" id="navBackBtn" title="后退" disabled><i class="fas fa-arrow-left"></i></button>
+                            <button class="file-path-btn" id="navForwardBtn" title="前进" disabled><i class="fas fa-arrow-right"></i></button>
+                            <button class="file-path-btn" id="navUpBtn" title="上级目录"><i class="fas fa-level-up-alt"></i></button>
+                            <i class="fas fa-folder-open" style="margin-left:8px"></i>
+                            <input type="text" class="file-path-input" id="remotePath" value="/">
+                            <button class="file-path-btn" id="goPathBtn" title="跳转"><i class="fas fa-arrow-right"></i></button>
+                        </div>
+                        <div class="file-list-header">
+                            <span></span><span>名称 <small style="color:var(--color-text-3);font-weight:normal">(Ctrl+点击多选)</small></span><span style="text-align:right">大小</span><span>修改时间 <span id="selectedCount" style="color:var(--color-accent);margin-left:8px"></span></span>
+                        </div>
+                        <div class="file-list" id="fileList">
+                            <div class="empty"><i class="fas fa-plug"></i><p>请先连接服务器</p></div>
+                        </div>
+                    </div>
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>拖拽文件到此处，或点击下方按钮上传</p>
+                        <div class="upload-btns">
+                            <button class="btn" id="uploadFilesBtn" disabled><i class="fas fa-file-upload"></i> 上传文件</button>
+                            <button class="btn btn-secondary" id="uploadFolderBtn" disabled><i class="fas fa-folder-upload"></i> 上传文件夹</button>
+                        </div>
+                        <div class="upload-progress" id="uploadProgress">
+                            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                            <div class="progress-text" id="progressText">上传中...</div>
+                        </div>
+                    </div>
+                    <input type="file" class="hidden-input" id="fileInput" multiple>
+                    <input type="file" class="hidden-input" id="folderInput" webkitdirectory directory multiple>
+                </div>
+            </div>
+
+            <!-- VNC -->

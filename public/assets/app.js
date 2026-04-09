@@ -223,6 +223,10 @@
                     '奇校验': 'Odd',
                     '流控制': 'Flow Control',
                     '硬件': 'Hardware',
+                    '串口设备': 'Serial Device',
+                    '搜索已授权串口，例如 VID:PID': 'Search granted serial ports, for example VID:PID',
+                    '刷新已授权串口': 'Refresh granted serial ports',
+                    '添加新串口': 'Add Serial Port',
                     '连接串口': 'Connect Serial',
                     '模拟数据演示': 'Demo Data',
                     '演示': 'Demo',
@@ -436,6 +440,7 @@
                     '填写本机 SSH 凭据后点击 "连接" 按钮开启终端': 'Enter local SSH credentials, then click "Connect" to start the terminal',
                     '点击 "启动" 按钮开启终端': 'Click "Start" to launch the terminal',
                     '点击 "连接串口" 按钮选择串口设备': 'Click "Connect Serial" to choose a serial device',
+                    '可先在上方搜索已授权串口，或直接点击 "连接串口" 选择设备': 'Search granted serial ports above, or click "Connect Serial" to choose a device directly',
                     '当前平台不允许访问串口': 'Serial access is not available on the current platform',
                     '波形数据: Sin, Cos, Sin3Hz, ADC, Temp': 'Waveform data: Sin, Cos, Sin3Hz, ADC, Temp',
                     '统计数据: stats:[a:x, b:x, c:x, d:x] 格式': 'Statistics data: stats:[a:x, b:x, c:x, d:x] format',
@@ -495,6 +500,14 @@
                     '串口已连接': 'Serial connected',
                     '未选择串口设备': 'No serial device selected',
                     '未知错误': 'Unknown error',
+                    '可搜索已授权串口，未找到时点击“添加新串口”。': 'Search granted serial ports here. If nothing matches, click "Add Serial Port".',
+                    '输入关键字搜索已授权串口。': 'Type keywords to search granted serial ports.',
+                    '尚无已授权串口，点击“添加新串口”从系统中选择。': 'No granted serial ports yet. Click "Add Serial Port" to choose one from the system picker.',
+                    '未找到匹配的已授权串口，可点击“添加新串口”。': 'No matching granted serial port found. Click "Add Serial Port" to authorize another one.',
+                    '已授权串口': 'Granted serial port',
+                    '蓝牙串口': 'Bluetooth serial',
+                    'USB 串口': 'USB serial',
+                    '当前串口已从系统断开': 'The current serial port was disconnected from the system',
                     '串口权限被拒绝，请在权限弹窗中允许串口访问。': 'Serial access was denied. Allow the port in the permission dialog.',
                     '当前用户可能没有串口设备权限，请将用户加入 dialout/uucp 组并重新登录。': 'The current user may not have permission to access serial devices. Add the user to the dialout/uucp group and sign in again.',
                     '串口被占用或无权限访问，请检查设备占用和用户组权限。': 'The serial port is busy or access is denied. Check whether the device is in use and verify group permissions.',
@@ -923,6 +936,9 @@
                     [/^(.+?) 当前未检测到候选项，可直接手动输入。$/u, (_match, prefix) => `${I18n.auto(prefix)} No candidates detected right now. You can type manually.`],
                     [/^当前显示 (\d+) 个 pyOCD 插件前缀，选择后可在右侧继续补充 UID。$/u, 'Showing $1 pyOCD probe prefixes. After selecting one, you can continue entering the UID on the right.'],
                     [/^当前检测到 (\d+) 个候选项。$/u, '$1 candidates detected.'],
+                    [/^已载入 (\d+) 个已授权串口，支持按标签、VID:PID 搜索。$/u, 'Loaded $1 granted serial ports. Search by label or VID:PID.'],
+                    [/^已选择串口：(.+)$/u, 'Selected serial port: $1'],
+                    [/^已授权串口列表刷新失败: (.+)$/u, (_match, message) => `Failed to refresh granted serial ports: ${I18n.auto(message)}`],
                     [/^正在检测 (.+) \.\.\.$/u, 'Checking $1...'],
                     [/^SSH 到 (.+)$/u, 'SSH to $1'],
                     [/^当前服务器: (.+)$/u, 'Current server: $1'],
@@ -4075,6 +4091,527 @@
             queuedSize: 0,
             queueScheduled: false,
             lastDropNotice: 0,
+            grantedPorts: [],
+            selectedGrantedPortId: '',
+            grantedPortIds: new WeakMap(),
+            grantedPortSeq: 0,
+            portSearchUi: {
+                activeIndex: -1,
+                results: [],
+                closeTimer: null,
+                lastQuery: ''
+            },
+
+            getPortSearchInput() {
+                return document.getElementById('serialPortSearch');
+            },
+
+            getPortSuggestionsPanel() {
+                return document.getElementById('serialPortSuggestions');
+            },
+
+            ensureGrantedPortId(port) {
+                if (!port) return '';
+                let id = this.grantedPortIds.get(port);
+                if (!id) {
+                    id = `serial-port-${++this.grantedPortSeq}`;
+                    this.grantedPortIds.set(port, id);
+                }
+                return id;
+            },
+
+            formatPortHex(value) {
+                const numericValue = Number(value);
+                if (!Number.isFinite(numericValue)) return '';
+                return numericValue.toString(16).toUpperCase().padStart(4, '0');
+            },
+
+            buildGrantedPortDescriptor(port, index = 0) {
+                const info = port && typeof port.getInfo === 'function'
+                    ? (port.getInfo() || {})
+                    : {};
+                return {
+                    id: this.ensureGrantedPortId(port),
+                    port,
+                    ordinal: index + 1,
+                    usbVendorId: this.formatPortHex(info.usbVendorId),
+                    usbProductId: this.formatPortHex(info.usbProductId),
+                    bluetoothServiceClassId: info.bluetoothServiceClassId ? String(info.bluetoothServiceClassId) : ''
+                };
+            },
+
+            getGrantedPortSortKey(descriptor) {
+                if (!descriptor) return '';
+                return [
+                    descriptor.usbVendorId || 'ZZZZ',
+                    descriptor.usbProductId || 'ZZZZ',
+                    descriptor.bluetoothServiceClassId || 'ZZZZ',
+                    descriptor.id || ''
+                ].join(':');
+            },
+
+            describeGrantedPort(descriptor) {
+                if (!descriptor) return '';
+                if (descriptor.usbVendorId || descriptor.usbProductId) {
+                    return `USB ${descriptor.usbVendorId || '????'}:${descriptor.usbProductId || '????'}`;
+                }
+                if (descriptor.bluetoothServiceClassId) {
+                    return `${I18n.auto('蓝牙串口')} ${descriptor.bluetoothServiceClassId}`;
+                }
+                return `${I18n.auto('已授权串口')} ${descriptor.ordinal}`;
+            },
+
+            describeGrantedPortMeta(descriptor) {
+                if (!descriptor) return '';
+                const parts = [];
+                if (descriptor.usbVendorId || descriptor.usbProductId) {
+                    parts.push(I18n.auto('USB 串口'));
+                    if (descriptor.usbVendorId) parts.push(`VID:${descriptor.usbVendorId}`);
+                    if (descriptor.usbProductId) parts.push(`PID:${descriptor.usbProductId}`);
+                } else if (descriptor.bluetoothServiceClassId) {
+                    parts.push(I18n.auto('蓝牙串口'));
+                    parts.push(`UUID:${descriptor.bluetoothServiceClassId}`);
+                } else {
+                    parts.push(`${I18n.auto('已授权串口')} #${descriptor.ordinal}`);
+                }
+                return parts.join(' · ');
+            },
+
+            buildGrantedPortSearchText(descriptor) {
+                return [
+                    this.describeGrantedPort(descriptor),
+                    this.describeGrantedPortMeta(descriptor),
+                    descriptor.usbVendorId,
+                    descriptor.usbProductId,
+                    descriptor.bluetoothServiceClassId,
+                    descriptor.usbVendorId && descriptor.usbProductId
+                        ? `${descriptor.usbVendorId}:${descriptor.usbProductId}`
+                        : '',
+                    descriptor.usbVendorId ? `vid:${descriptor.usbVendorId}` : '',
+                    descriptor.usbProductId ? `pid:${descriptor.usbProductId}` : '',
+                    'usb',
+                    'serial',
+                    'port'
+                ].filter(Boolean).join(' ').toLowerCase();
+            },
+
+            normalizeGrantedPorts(descriptors = []) {
+                return descriptors
+                    .filter((descriptor) => descriptor && descriptor.port)
+                    .sort((left, right) => this.getGrantedPortSortKey(left).localeCompare(this.getGrantedPortSortKey(right)))
+                    .map((descriptor, index) => ({
+                        ...descriptor,
+                        ordinal: index + 1
+                    }));
+            },
+
+            getSelectedGrantedPort() {
+                return this.grantedPorts.find((descriptor) => descriptor.id === this.selectedGrantedPortId) || null;
+            },
+
+            findGrantedPortByPort(port) {
+                return this.grantedPorts.find((descriptor) => descriptor.port === port) || null;
+            },
+
+            clearSelectedGrantedPort(options = {}) {
+                this.selectedGrantedPortId = '';
+                if (!options.keepInput) {
+                    const input = this.getPortSearchInput();
+                    if (input) {
+                        input.value = '';
+                    }
+                }
+                this.updatePortHint(options.message || '');
+            },
+
+            selectGrantedPort(descriptor, options = {}) {
+                if (!descriptor) {
+                    this.clearSelectedGrantedPort(options);
+                    return;
+                }
+                this.selectedGrantedPortId = descriptor.id;
+                const input = this.getPortSearchInput();
+                if (input && options.syncInput !== false) {
+                    input.value = this.describeGrantedPort(descriptor);
+                }
+                this.updatePortHint();
+                if (options.keepSuggestionsOpen !== true) {
+                    this.closePortSuggestions();
+                }
+            },
+
+            updatePortHint(message = '') {
+                const hint = document.getElementById('serialPortHint');
+                if (!hint) return;
+
+                if (message) {
+                    hint.textContent = I18n.auto(message);
+                    return;
+                }
+
+                const selected = this.getSelectedGrantedPort();
+                if (selected) {
+                    hint.textContent = I18n.auto(`已选择串口：${this.describeGrantedPort(selected)}`);
+                    return;
+                }
+
+                if (!this.grantedPorts.length) {
+                    hint.textContent = I18n.auto('尚无已授权串口，点击“添加新串口”从系统中选择。');
+                    return;
+                }
+
+                hint.textContent = I18n.auto(`已载入 ${this.grantedPorts.length} 个已授权串口，支持按标签、VID:PID 搜索。`);
+            },
+
+            clearPortSuggestionsCloseTimer() {
+                if (this.portSearchUi.closeTimer) {
+                    clearTimeout(this.portSearchUi.closeTimer);
+                    this.portSearchUi.closeTimer = null;
+                }
+            },
+
+            schedulePortSuggestionsClose() {
+                this.clearPortSuggestionsCloseTimer();
+                this.portSearchUi.closeTimer = setTimeout(() => {
+                    this.closePortSuggestions();
+                }, 120);
+            },
+
+            closePortSuggestions() {
+                this.clearPortSuggestionsCloseTimer();
+                this.portSearchUi.activeIndex = -1;
+                this.portSearchUi.results = [];
+                this.portSearchUi.lastQuery = '';
+                const panel = this.getPortSuggestionsPanel();
+                if (!panel) return;
+                panel.innerHTML = '';
+                panel.classList.add('flashdebug-hidden');
+            },
+
+            normalizePortSearch(value) {
+                return String(value || '').trim().toLowerCase();
+            },
+
+            fuzzyPortMatch(query, text) {
+                if (!query || !text) return null;
+
+                let queryIndex = 0;
+                let start = -1;
+                let previousMatch = -1;
+                let gaps = 0;
+
+                for (let index = 0; index < text.length && queryIndex < query.length; index += 1) {
+                    if (text[index] !== query[queryIndex]) continue;
+                    if (start === -1) {
+                        start = index;
+                    } else {
+                        gaps += index - previousMatch - 1;
+                    }
+                    previousMatch = index;
+                    queryIndex += 1;
+                }
+
+                if (queryIndex !== query.length) {
+                    return null;
+                }
+
+                return { start, gaps };
+            },
+
+            scoreGrantedPort(query, descriptor) {
+                if (!query || !descriptor) return -1;
+
+                const label = this.describeGrantedPort(descriptor).toLowerCase();
+                const meta = this.describeGrantedPortMeta(descriptor).toLowerCase();
+                const searchText = this.buildGrantedPortSearchText(descriptor);
+
+                if (label === query) return 10000 - label.length;
+                if (label.startsWith(query)) return 9000 - label.length;
+
+                const labelIndex = label.indexOf(query);
+                if (labelIndex !== -1) {
+                    return 8200 - (labelIndex * 10) - label.length;
+                }
+
+                const metaIndex = meta.indexOf(query);
+                if (metaIndex !== -1) {
+                    return 7600 - (metaIndex * 10) - meta.length;
+                }
+
+                const searchIndex = searchText.indexOf(query);
+                if (searchIndex !== -1) {
+                    return 7000 - (searchIndex * 4) - searchText.length;
+                }
+
+                const fuzzyLabel = this.fuzzyPortMatch(query, label);
+                if (fuzzyLabel) {
+                    return 5200 - (fuzzyLabel.gaps * 4) - fuzzyLabel.start;
+                }
+
+                const fuzzyMeta = this.fuzzyPortMatch(query, meta);
+                if (fuzzyMeta) {
+                    return 4200 - (fuzzyMeta.gaps * 4) - fuzzyMeta.start;
+                }
+
+                return -1;
+            },
+
+            searchGrantedPorts(query, limit = 24) {
+                const normalizedQuery = this.normalizePortSearch(query);
+                if (!normalizedQuery) {
+                    return this.grantedPorts.slice(0, limit);
+                }
+
+                const results = [];
+                this.grantedPorts.forEach((descriptor) => {
+                    const score = this.scoreGrantedPort(normalizedQuery, descriptor);
+                    if (score < 0) return;
+                    results.push({ descriptor, score });
+                });
+
+                results.sort((left, right) => {
+                    if (right.score !== left.score) {
+                        return right.score - left.score;
+                    }
+                    return this.getGrantedPortSortKey(left.descriptor).localeCompare(this.getGrantedPortSortKey(right.descriptor));
+                });
+
+                return results.slice(0, limit).map((result) => result.descriptor);
+            },
+
+            renderPortSuggestions(results = [], message = '') {
+                const panel = this.getPortSuggestionsPanel();
+                if (!panel) return;
+
+                panel.innerHTML = '';
+                panel.classList.remove('flashdebug-hidden');
+
+                if (!results.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'flashdebug-suggestion-empty';
+                    empty.textContent = I18n.auto(message || '输入关键字搜索已授权串口。');
+                    panel.appendChild(empty);
+                    return;
+                }
+
+                results.forEach((descriptor, index) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'flashdebug-suggestion';
+                    if (index === this.portSearchUi.activeIndex) {
+                        button.classList.add('active');
+                    }
+
+                    const primary = document.createElement('span');
+                    primary.className = 'flashdebug-suggestion-primary';
+                    primary.textContent = this.describeGrantedPort(descriptor);
+                    button.appendChild(primary);
+
+                    const meta = document.createElement('span');
+                    meta.className = 'flashdebug-suggestion-meta';
+                    const metaText = this.describeGrantedPortMeta(descriptor);
+                    meta.textContent = descriptor.id === this.selectedGrantedPortId
+                        ? `${metaText} · ${I18n.auto('当前')}`
+                        : metaText;
+                    button.appendChild(meta);
+
+                    button.addEventListener('mousedown', (event) => {
+                        event.preventDefault();
+                        this.selectGrantedPort(descriptor);
+                    });
+                    panel.appendChild(button);
+                });
+
+                const activeButton = panel.querySelector('.flashdebug-suggestion.active');
+                if (activeButton) {
+                    activeButton.scrollIntoView({ block: 'nearest' });
+                }
+            },
+
+            updatePortSuggestions() {
+                const input = this.getPortSearchInput();
+                const panel = this.getPortSuggestionsPanel();
+                if (!input || !panel) return;
+
+                this.clearPortSuggestionsCloseTimer();
+
+                const query = input.value.trim();
+                let results = [];
+                let message = '';
+
+                if (!this.grantedPorts.length) {
+                    message = '尚无已授权串口，点击“添加新串口”从系统中选择。';
+                } else if (!query) {
+                    results = this.searchGrantedPorts('', 24);
+                } else {
+                    results = this.searchGrantedPorts(query, 24);
+                    if (!results.length) {
+                        message = '未找到匹配的已授权串口，可点击“添加新串口”。';
+                    }
+                }
+
+                const sameQuery = this.portSearchUi.lastQuery === query;
+                this.portSearchUi.results = results;
+                this.portSearchUi.lastQuery = query;
+                if (results.length > 0) {
+                    this.portSearchUi.activeIndex = sameQuery
+                        ? Math.min(Math.max(this.portSearchUi.activeIndex, 0), results.length - 1)
+                        : 0;
+                } else {
+                    this.portSearchUi.activeIndex = -1;
+                }
+
+                this.renderPortSuggestions(results, message);
+            },
+
+            movePortSuggestionSelection(delta) {
+                if (!this.portSearchUi.results.length) {
+                    this.updatePortSuggestions();
+                }
+                if (!this.portSearchUi.results.length) return;
+
+                const total = this.portSearchUi.results.length;
+                const current = this.portSearchUi.activeIndex;
+                const nextIndex = current < 0
+                    ? (delta > 0 ? 0 : total - 1)
+                    : (current + delta + total) % total;
+                this.portSearchUi.activeIndex = nextIndex;
+                this.renderPortSuggestions(this.portSearchUi.results);
+            },
+
+            handlePortSearchInput() {
+                const input = this.getPortSearchInput();
+                if (!input) return;
+
+                const selected = this.getSelectedGrantedPort();
+                if (selected && input.value.trim() !== this.describeGrantedPort(selected)) {
+                    this.selectedGrantedPortId = '';
+                }
+                this.updatePortHint();
+                this.updatePortSuggestions();
+            },
+
+            handlePortSearchKeydown(event) {
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    this.movePortSuggestionSelection(1);
+                    return;
+                }
+
+                if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    this.movePortSuggestionSelection(-1);
+                    return;
+                }
+
+                if (event.key === 'Enter') {
+                    if (this.portSearchUi.activeIndex >= 0 && this.portSearchUi.results[this.portSearchUi.activeIndex]) {
+                        event.preventDefault();
+                        this.selectGrantedPort(this.portSearchUi.results[this.portSearchUi.activeIndex]);
+                    }
+                    return;
+                }
+
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    this.closePortSuggestions();
+                }
+            },
+
+            async refreshGrantedPorts() {
+                try {
+                    const selectedPort = this.getSelectedGrantedPort() ? this.getSelectedGrantedPort().port : null;
+                    const ports = await navigator.serial.getPorts();
+                    this.grantedPorts = this.normalizeGrantedPorts(
+                        ports.map((port, index) => this.buildGrantedPortDescriptor(port, index))
+                    );
+
+                    if (selectedPort) {
+                        const selectedDescriptor = this.findGrantedPortByPort(selectedPort);
+                        this.selectedGrantedPortId = selectedDescriptor ? selectedDescriptor.id : '';
+                    } else if (this.selectedGrantedPortId && !this.getSelectedGrantedPort()) {
+                        this.selectedGrantedPortId = '';
+                    }
+
+                    this.updatePortHint();
+                    if (document.activeElement && document.activeElement.id === 'serialPortSearch') {
+                        this.updatePortSuggestions();
+                    }
+                } catch (error) {
+                    console.error('刷新已授权串口失败:', error);
+                    this.updatePortHint(`已授权串口列表刷新失败: ${error.message || error}`);
+                }
+            },
+
+            rememberGrantedPort(port) {
+                if (!port) return null;
+                const existing = this.findGrantedPortByPort(port);
+                if (existing) return existing;
+
+                this.grantedPorts = this.normalizeGrantedPorts([
+                    ...this.grantedPorts,
+                    this.buildGrantedPortDescriptor(port, this.grantedPorts.length)
+                ]);
+                return this.findGrantedPortByPort(port);
+            },
+
+            dropGrantedPort(port) {
+                if (!port) return;
+                this.grantedPorts = this.normalizeGrantedPorts(
+                    this.grantedPorts
+                        .filter((descriptor) => descriptor.port !== port)
+                        .map((descriptor, index) => this.buildGrantedPortDescriptor(descriptor.port, index))
+                );
+            },
+
+            resolveConnectPort() {
+                const selected = this.getSelectedGrantedPort();
+                if (selected) {
+                    return selected.port;
+                }
+
+                const input = this.getPortSearchInput();
+                const query = input ? input.value.trim() : '';
+                if (!query) return null;
+
+                const matched = this.searchGrantedPorts(query, 1)[0] || null;
+                if (!matched) return null;
+
+                this.selectGrantedPort(matched);
+                return matched.port;
+            },
+
+            async requestNewPort(options = {}) {
+                const config = {
+                    silentCancel: false,
+                    focusSearch: true,
+                    ...options
+                };
+
+                try {
+                    const port = await navigator.serial.requestPort();
+                    const descriptor = this.rememberGrantedPort(port);
+                    if (descriptor) {
+                        this.selectGrantedPort(descriptor);
+                    }
+                    if (config.focusSearch) {
+                        const input = this.getPortSearchInput();
+                        if (input) {
+                            input.focus();
+                            input.select();
+                        }
+                    }
+                    return port;
+                } catch (error) {
+                    if (error && error.name === 'NotFoundError') {
+                        if (!config.silentCancel) {
+                            Toast.info('未选择串口设备');
+                        }
+                        return null;
+                    }
+                    throw error;
+                }
+            },
 
             init() {
                 // 检查浏览器支持
@@ -4085,6 +4622,9 @@
                         '<p style="color:var(--color-warning);margin-bottom:8px"><i class="fas fa-exclamation-triangle"></i> 当前环境不支持 Web Serial</p>' +
                         '<p style="color:var(--color-text-2);font-size:12px">请使用支持 Web Serial 的桌面应用或 Chromium 内核浏览器</p>';
                     document.getElementById('serialConnectBtn').disabled = true;
+                    document.getElementById('serialRequestPortBtn').disabled = true;
+                    document.getElementById('serialRefreshPortsBtn').disabled = true;
+                    document.getElementById('serialPortSearch').disabled = true;
                     return;
                 }
 
@@ -4116,6 +4656,29 @@
                 document.getElementById('serialClearBtn').addEventListener('click', () => { this.term.clear(); this.welcome(); });
                 document.getElementById('serialSendBtn').addEventListener('click', () => this.sendData());
                 document.getElementById('serialSendInput').addEventListener('keypress', e => { if (e.key === 'Enter') this.sendData(); });
+                document.getElementById('serialRequestPortBtn').addEventListener('click', async () => {
+                    try {
+                        await this.requestNewPort();
+                        this.updatePortSuggestions();
+                    } catch (error) {
+                        Toast.error(`连接失败: ${error.message || error}`);
+                    }
+                });
+                document.getElementById('serialRefreshPortsBtn').addEventListener('click', () => {
+                    void this.refreshGrantedPorts();
+                });
+
+                const portSearchInput = this.getPortSearchInput();
+                const portSuggestionsPanel = this.getPortSuggestionsPanel();
+                if (portSearchInput) {
+                    portSearchInput.addEventListener('input', () => this.handlePortSearchInput());
+                    portSearchInput.addEventListener('focus', () => this.updatePortSuggestions());
+                    portSearchInput.addEventListener('keydown', (event) => this.handlePortSearchKeydown(event));
+                    portSearchInput.addEventListener('blur', () => this.schedulePortSuggestionsClose());
+                }
+                if (portSuggestionsPanel) {
+                    portSuggestionsPanel.addEventListener('mousedown', (event) => event.preventDefault());
+                }
 
                 // Waveform event handlers
                 document.getElementById('serialWaveformBtn').addEventListener('click', () => this.toggleWaveform());
@@ -4133,6 +4696,41 @@
 
                 // Demo mode button
                 document.getElementById('serialDemoBtn').addEventListener('click', () => this.startDemo());
+
+                if (typeof navigator.serial.addEventListener === 'function') {
+                    navigator.serial.addEventListener('connect', (event) => {
+                        const port = event && event.port ? event.port : null;
+                        if (port) {
+                            this.rememberGrantedPort(port);
+                            this.updatePortHint();
+                            if (document.activeElement && document.activeElement.id === 'serialPortSearch') {
+                                this.updatePortSuggestions();
+                            }
+                        } else {
+                            void this.refreshGrantedPorts();
+                        }
+                    });
+                    navigator.serial.addEventListener('disconnect', (event) => {
+                        const port = event && event.port ? event.port : null;
+                        const selected = this.getSelectedGrantedPort();
+                        const selectedPort = selected ? selected.port : null;
+                        this.dropGrantedPort(port);
+                        if (selectedPort && selectedPort === port) {
+                            this.clearSelectedGrantedPort({
+                                keepInput: false,
+                                message: '当前串口已从系统断开'
+                            });
+                        } else {
+                            this.updatePortHint();
+                        }
+                        if (document.activeElement && document.activeElement.id === 'serialPortSearch') {
+                            this.updatePortSuggestions();
+                        }
+                    });
+                }
+
+                this.updatePortHint();
+                void this.refreshGrantedPorts();
             },
 
             applyTheme() {
@@ -4315,7 +4913,7 @@
                 this.term.writeln(`\x1b[${colors.frame}m  ║\x1b[0m    \x1b[${colors.title}mSerial Terminal (WebSerial)\x1b[0m          \x1b[${colors.frame}m║\x1b[0m`);
                 this.term.writeln(`\x1b[${colors.frame}m  ╚══════════════════════════════════════════╝\x1b[0m`);
                 this.term.writeln('');
-                this.term.writeln(`\x1b[90m  ${I18n.auto('点击 "连接串口" 按钮选择串口设备')}\x1b[0m`);
+                this.term.writeln(`\x1b[90m  ${I18n.auto('可先在上方搜索已授权串口，或直接点击 "连接串口" 选择设备')}\x1b[0m`);
                 this.term.writeln('');
             },
 
@@ -4325,8 +4923,15 @@
                         Toast.error('当前平台不允许访问串口');
                         return;
                     }
-                    // 请求串口
-                    this.port = await navigator.serial.requestPort();
+                    this.port = this.resolveConnectPort();
+                    if (!this.port) {
+                        this.port = await this.requestNewPort({ silentCancel: true, focusSearch: false });
+                        if (!this.port) {
+                            Toast.info('未选择串口设备');
+                            this.term.writeln(`\x1b[33m${I18n.auto('未选择串口设备')}\x1b[0m`);
+                            return;
+                        }
+                    }
 
                     // 获取配置
                     const baudRate = parseInt(document.getElementById('serialBaudRate').value);
@@ -4632,6 +5237,9 @@
                 const demoBtn = document.getElementById('serialDemoBtn');
                 const sendBtn = document.getElementById('serialSendBtn');
                 const title = document.getElementById('serialTermTitle');
+                const searchInput = document.getElementById('serialPortSearch');
+                const refreshBtn = document.getElementById('serialRefreshPortsBtn');
+                const requestBtn = document.getElementById('serialRequestPortBtn');
 
                 if (connected) {
                     status.classList.remove('disconnected');
@@ -4651,6 +5259,19 @@
                     demoBtn.disabled = false;
                     sendBtn.disabled = true;
                     title.textContent = I18n.auto('串口终端 - 未连接');
+                }
+
+                if (searchInput) {
+                    searchInput.disabled = connected;
+                }
+                if (refreshBtn) {
+                    refreshBtn.disabled = connected;
+                }
+                if (requestBtn) {
+                    requestBtn.disabled = connected;
+                }
+                if (connected) {
+                    this.closePortSuggestions();
                 }
             }
         };

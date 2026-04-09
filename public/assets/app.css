@@ -499,6 +499,49 @@
         .input-group { display: flex; flex-direction: column; gap: 4px; }
         .input-group label { font-size: 12px; color: var(--color-text-2); }
         .input-group .form-input { min-width: 120px; padding: 10px 12px; }
+        .serial-port-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        .serial-port-autocomplete {
+            flex: 1;
+            min-width: 0;
+            width: 100%;
+        }
+        .serial-port-autocomplete .form-input {
+            flex: 1;
+            min-width: 0;
+            width: 100%;
+        }
+        .serial-port-input {
+            font-size: 12px;
+            padding: 10px;
+        }
+        .serial-port-input::placeholder {
+            font-size: 11px;
+        }
+        .serial-port-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .serial-port-actions .btn {
+            flex-shrink: 0;
+            min-width: 40px;
+            flex: 1;
+        }
+        .serial-toolbar-actions {
+            margin-left: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .serial-toolbar-actions .btn {
+            min-width: 40px;
+        }
         .auth-key-panel {
             width: 100%;
             display: none;

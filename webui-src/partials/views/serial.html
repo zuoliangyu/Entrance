@@ -44,10 +44,20 @@
                                 <option value="hardware">硬件</option>
                             </select>
                         </div>
-                        <div class="input-group" style="justify-content:flex-end">
-                            <label>&nbsp;</label>
-                            <button class="btn btn-success" id="serialConnectBtn"><i class="fas fa-plug"></i> 连接串口</button>
-                            <button class="btn btn-secondary" id="serialDemoBtn" title="模拟数据演示"><i class="fas fa-flask"></i> 演示</button>
+                        <div class="input-group serial-port-group">
+                            <label>串口设备</label>
+                            <div class="flashdebug-autocomplete serial-port-autocomplete">
+                                <input type="text" class="form-input serial-port-input" id="serialPortSearch" placeholder="搜索已授权串口，例如 VID:PID" autocomplete="off" spellcheck="false">
+                                <div class="flashdebug-suggestions flashdebug-hidden" id="serialPortSuggestions"></div>
+                            </div>
+                        </div>
+                        <div class="serial-port-actions">
+                            <button class="btn btn-secondary btn-icon" id="serialRefreshPortsBtn" title="刷新已授权串口" aria-label="刷新已授权串口"><i class="fas fa-rotate"></i></button>
+                            <button class="btn btn-secondary btn-icon" id="serialRequestPortBtn" title="添加新串口" aria-label="添加新串口"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <div class="serial-toolbar-actions">
+                            <button class="btn btn-success btn-icon" id="serialConnectBtn" title="连接串口" aria-label="连接串口"><i class="fas fa-plug"></i></button>
+                            <button class="btn btn-secondary btn-icon" id="serialDemoBtn" title="模拟数据演示" aria-label="模拟数据演示"><i class="fas fa-flask"></i></button>
                         </div>
                     </div>
                     <div class="sftp-status disconnected" id="serialStatus">

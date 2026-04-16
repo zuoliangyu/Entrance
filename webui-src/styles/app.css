@@ -880,6 +880,30 @@
             gap: 8px;
             align-items: center;
         }
+        .flashdebug-extraargs-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .flashdebug-extraargs {
+            display: grid;
+            gap: 10px;
+        }
+        .flashdebug-extraarg-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1.7fr) minmax(180px, 0.9fr) auto;
+            gap: 10px;
+            align-items: end;
+        }
+        .flashdebug-extraarg-actions {
+            display: flex;
+            align-items: flex-end;
+        }
+        .flashdebug-extraarg-actions .btn {
+            white-space: nowrap;
+        }
         .flashdebug-inline-actions .form-input {
             flex: 1;
             min-width: 0;
@@ -981,6 +1005,10 @@
                 align-items: flex-start;
             }
             .flashdebug-tool-row { justify-content: flex-start; }
+        }
+        @media (max-width: 720px) {
+            .flashdebug-extraarg-row { grid-template-columns: 1fr; }
+            .flashdebug-extraarg-actions { justify-content: flex-end; }
         }
 
         /* System Stats Monitor */

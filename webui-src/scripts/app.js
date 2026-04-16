@@ -276,7 +276,14 @@
                     '选择文件': 'Choose File',
                     '选择本地文件后会上传到当前 Entrance 主机的临时目录，并自动回填路径。': 'Selecting a local file uploads it to a temporary path on the current Entrance host and fills the path automatically.',
                     '附加参数': 'Extra Arguments',
+                    '附加参数格式无效': 'Extra argument format is invalid',
+                    '附加参数插入位置无效': 'Extra argument insertion position is invalid',
                     '可选，补充板卡专用 CLI 参数': 'Optional extra CLI parameters for the target board',
+                    '添加参数': 'Add Argument',
+                    '插入位置': 'Insertion Position',
+                    '尾部动作前': 'Before Final Action',
+                    '命令末尾': 'Command End',
+                    '可按需添加或删除参数项，每一项都可单独选择插入位置，命令预览会按这里的顺序拼接。': 'Add or remove argument entries as needed. Each entry can choose its own insertion position, and the command preview follows this order.',
                     '请求管理员/root 权限': 'Request admin/root privileges',
                     '写后校验': 'Verify after write',
                     '烧录后复位': 'Reset after flash',
@@ -895,6 +902,7 @@
             PATTERNS: {
                 zh: [],
                 en: [
+                    [/^参数 (\d+)$/u, 'Argument $1'],
                     [/^已连接到 (.+)$/u, 'Connected to $1'],
                     [/^已连接: (.+)$/u, 'Connected: $1'],
                     [/^SFTP 已连接到 (.+)$/u, 'SFTP connected to $1'],
@@ -5619,6 +5627,8 @@
                 document.getElementById('debugProbeSelect').addEventListener('change', () => {
                     document.getElementById('debugProbeInput').value = document.getElementById('debugProbeSelect').value;
                 });
+                this.initExtraArgEditor('flash');
+                this.initExtraArgEditor('debug');
                 this.getAutocompleteInputIds().forEach((inputId) => this.bindAutocompleteInput(inputId));
                 document.getElementById('flashFirmwareSelectBtn').addEventListener('click', () => this.pickFirmwareFile());
                 document.getElementById('cliElfSelectBtn').addEventListener('click', () => this.pickCliElfFile());
@@ -6362,7 +6372,7 @@
                     'flashSpeedInput',
                     'flashFirmwarePath',
                     'flashFirmwareSelectBtn',
-                    'flashExtraArgs',
+                    'flashExtraArgsAddBtn',
                     'flashRequestElevation',
                     'flashVerify',
                     'flashReset'
@@ -6376,7 +6386,7 @@
                     'debugPortInput',
                     'debugTelnetPortInput',
                     'debugElfPath',
-                    'debugExtraArgs',
+                    'debugExtraArgsAddBtn',
                     'debugRequestElevation'
                 ];
                 const cliSessionIds = [
@@ -6427,11 +6437,17 @@
                         el.disabled = locked || serviceBusy;
                     }
                 });
+                this.getExtraArgControls('flash').forEach((el) => {
+                    el.disabled = locked || serviceBusy;
+                });
                 debugIds.forEach((id) => {
                     const el = document.getElementById(id);
                     if (el) {
                         el.disabled = locked || serviceBusy;
                     }
+                });
+                this.getExtraArgControls('debug').forEach((el) => {
+                    el.disabled = locked || serviceBusy;
                 });
                 cliSessionIds.forEach((id) => {
                     const el = document.getElementById(id);
@@ -6880,6 +6896,118 @@
                 return Boolean(checkbox && checkbox.checked);
             },
 
+            getExtraArgList(prefix) {
+                return document.getElementById(`${prefix}ExtraArgsList`);
+            },
+
+            initExtraArgEditor(prefix) {
+                const list = this.getExtraArgList(prefix);
+                const addBtn = document.getElementById(`${prefix}ExtraArgsAddBtn`);
+                if (!list || !addBtn) return;
+
+                addBtn.addEventListener('click', () => this.addExtraArgEntry(prefix));
+                list.addEventListener('click', (event) => {
+                    const removeBtn = event.target.closest('[data-extra-arg-remove]');
+                    if (!removeBtn) return;
+                    const row = removeBtn.closest('[data-extra-arg-row]');
+                    if (!row) return;
+                    row.remove();
+                    this.syncExtraArgLabels(prefix);
+                    this.syncControls();
+                });
+
+                if (!list.querySelector('[data-extra-arg-row]')) {
+                    this.addExtraArgEntry(prefix);
+                }
+            },
+
+            addExtraArgEntry(prefix, entry = {}) {
+                const list = this.getExtraArgList(prefix);
+                if (!list) return;
+
+                const row = document.createElement('div');
+                row.className = 'flashdebug-extraarg-row';
+                row.dataset.extraArgRow = 'true';
+
+                const valueGroup = document.createElement('div');
+                valueGroup.className = 'input-group';
+                const valueLabel = document.createElement('label');
+                valueLabel.dataset.extraArgIndexLabel = 'true';
+                const valueInput = document.createElement('input');
+                valueInput.type = 'text';
+                valueInput.className = 'form-input';
+                valueInput.value = entry.value || '';
+                valueInput.dataset.extraArgControl = prefix;
+                valueInput.dataset.extraArgValue = 'true';
+                setI18nAttributeValue(valueInput, 'placeholder', '可选，补充板卡专用 CLI 参数');
+                valueGroup.appendChild(valueLabel);
+                valueGroup.appendChild(valueInput);
+
+                const positionGroup = document.createElement('div');
+                positionGroup.className = 'input-group';
+                const positionLabel = document.createElement('label');
+                setI18nTextValue(positionLabel, '插入位置');
+                const positionSelect = document.createElement('select');
+                positionSelect.className = 'form-input';
+                positionSelect.dataset.extraArgControl = prefix;
+                positionSelect.dataset.extraArgPosition = 'true';
+                const endOption = document.createElement('option');
+                endOption.value = 'end';
+                setI18nTextValue(endOption, '命令末尾');
+                const beforeTailOption = document.createElement('option');
+                beforeTailOption.value = 'before_tail';
+                setI18nTextValue(beforeTailOption, '尾部动作前');
+                positionSelect.appendChild(endOption);
+                positionSelect.appendChild(beforeTailOption);
+                positionSelect.value = entry.position === 'before_tail' ? 'before_tail' : 'end';
+                positionGroup.appendChild(positionLabel);
+                positionGroup.appendChild(positionSelect);
+
+                const actionGroup = document.createElement('div');
+                actionGroup.className = 'flashdebug-extraarg-actions';
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn btn-sm btn-danger';
+                removeBtn.dataset.extraArgControl = prefix;
+                removeBtn.dataset.extraArgRemove = 'true';
+                removeBtn.innerHTML = '<i class="fas fa-trash"></i> <span></span>';
+                setI18nTextValue(removeBtn.querySelector('span'), '删除');
+                actionGroup.appendChild(removeBtn);
+
+                row.appendChild(valueGroup);
+                row.appendChild(positionGroup);
+                row.appendChild(actionGroup);
+                list.appendChild(row);
+
+                this.syncExtraArgLabels(prefix);
+                this.syncControls();
+            },
+
+            syncExtraArgLabels(prefix) {
+                const rows = Array.from(this.getExtraArgList(prefix)?.querySelectorAll('[data-extra-arg-row]') || []);
+                rows.forEach((row, index) => {
+                    setI18nTextValue(row.querySelector('[data-extra-arg-index-label]'), `参数 ${index + 1}`);
+                });
+            },
+
+            getExtraArgControls(prefix) {
+                return Array.from(this.getExtraArgList(prefix)?.querySelectorAll('[data-extra-arg-control]') || []);
+            },
+
+            collectExtraArgEntries(prefix) {
+                const rows = Array.from(this.getExtraArgList(prefix)?.querySelectorAll('[data-extra-arg-row]') || []);
+                const entries = [];
+
+                rows.forEach((row) => {
+                    const value = row.querySelector('[data-extra-arg-value]')?.value.trim() || '';
+                    const position = row.querySelector('[data-extra-arg-position]')?.value || 'end';
+                    if (!value) return;
+                    entries.push({ value, position });
+                });
+
+                return entries;
+            },
+
             collectFlashOptions() {
                 const tool = this.currentTool;
                 const options = {
@@ -6888,7 +7016,7 @@
                     firmwarePath: document.getElementById('flashFirmwarePath').value.trim(),
                     verify: document.getElementById('flashVerify').checked,
                     resetAfterFlash: document.getElementById('flashReset').checked,
-                    extraArgs: document.getElementById('flashExtraArgs').value.trim()
+                    extraArgEntries: this.collectExtraArgEntries('flash')
                 };
 
                 if (tool === 'openocd') {
@@ -6909,7 +7037,7 @@
                     gdbPort: document.getElementById('debugPortInput').value.trim(),
                     telnetPort: document.getElementById('debugTelnetPortInput').value.trim(),
                     elfPath: document.getElementById('debugElfPath').value.trim(),
-                    extraArgs: document.getElementById('debugExtraArgs').value.trim()
+                    extraArgEntries: this.collectExtraArgEntries('debug')
                 };
 
                 if (tool === 'openocd') {

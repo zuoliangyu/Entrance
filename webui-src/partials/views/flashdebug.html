@@ -90,8 +90,12 @@
                                     <div class="flashdebug-field-note" id="flashFirmwareUploadHint">选择本地文件后会上传到当前 Entrance 主机的临时目录，并自动回填路径。</div>
                                 </div>
                                 <div class="input-group wide">
-                                    <label>附加参数</label>
-                                    <input type="text" class="form-input" id="flashExtraArgs" placeholder="可选，补充板卡专用 CLI 参数">
+                                    <div class="flashdebug-extraargs-head">
+                                        <label>附加参数</label>
+                                        <button type="button" class="btn btn-sm btn-secondary" id="flashExtraArgsAddBtn"><i class="fas fa-plus"></i> 添加参数</button>
+                                    </div>
+                                    <div class="flashdebug-extraargs" id="flashExtraArgsList"></div>
+                                    <div class="flashdebug-field-note">可按需添加或删除参数项，每一项都可单独选择插入位置，命令预览会按这里的顺序拼接。</div>
                                 </div>
                                 <div class="input-group wide">
                                     <div class="flashdebug-checkbox-row">
@@ -169,8 +173,12 @@
                                     <input type="text" class="form-input" id="debugElfPath" placeholder="可选，为 pyOCD 传入 ELF 文件">
                                 </div>
                                 <div class="input-group wide">
-                                    <label>附加参数</label>
-                                    <input type="text" class="form-input" id="debugExtraArgs" placeholder="可选，补充板卡专用 CLI 参数">
+                                    <div class="flashdebug-extraargs-head">
+                                        <label>附加参数</label>
+                                        <button type="button" class="btn btn-sm btn-secondary" id="debugExtraArgsAddBtn"><i class="fas fa-plus"></i> 添加参数</button>
+                                    </div>
+                                    <div class="flashdebug-extraargs" id="debugExtraArgsList"></div>
+                                    <div class="flashdebug-field-note">可按需添加或删除参数项，每一项都可单独选择插入位置，命令预览会按这里的顺序拼接。</div>
                                 </div>
                                 <div class="input-group wide">
                                     <div class="flashdebug-checkbox-row">

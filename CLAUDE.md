@@ -8,6 +8,10 @@ Entrance Tools is a web-based server management tool that supports SSH terminals
 
 Documentation is English-first: keep the root `README.md` as the default English README, keep the Simplified Chinese translation in `doc/README_CN.md`, use `doc/screenshot.png` from the root README, and use `screenshot_cn.png` inside `doc/README_CN.md`. Keep `AGENTS.md` and `CLAUDE.md` in English when updating repository guidance. Preserve each document's existing language when editing it; do not mix languages inside a file unless that file already does so intentionally. When `README.md` changes, update every corresponding `README_XX.md` translation document in the repository in the same pass; in this repository that means `doc/README_CN.md` must stay aligned with `README.md`.
 
+## Collaboration Preference
+
+When the user provides a numbered list of requirements such as `1.` and `2.`, first reply with the implementation plan and wait for approval before making changes.
+
 ## Build and Development Commands
 
 ```bash

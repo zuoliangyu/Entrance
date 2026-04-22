@@ -147,17 +147,21 @@ cd Entrance
 # Install dependencies
 npm install
 
-# Start the service
-npm start
+# Start the service with persistent local runtime data under ./.data
+./start.sh
 ```
 
-`npm start` now rebuilds the modular WebUI from `webui-src/` before launching the server. Use `npm run build:webui` if you only want to refresh the generated frontend assets.
+`./start.sh` is the preferred local entry point. On the first run, when `./.data` does not exist yet, it creates `./.data`, writes `./.data/auth_secret`, exports `ENTRANCE_DATA_DIR` and `AUTH_SECRET`, and then runs `npm start`.
+
+`npm start` still rebuilds the modular WebUI from `webui-src/` before launching the server, but it requires `AUTH_SECRET` to already be exported. Use `npm run build:webui` if you only want to refresh the generated frontend assets.
 
 Visit http://localhost:3000 and sign in to enter the dashboard.
 
 To use a different port, use an environment variable or CLI flag:
 
 ```bash
+PORT=4000 ./start.sh
+# or, if AUTH_SECRET is already exported
 PORT=4000 npm start
 # or
 npm start -- --port 4000
@@ -165,18 +169,20 @@ npm start -- --port 4000
 
 Then open `http://localhost:4000`.
 
-### Minimal Run Example
+### Manual Equivalent of `start.sh`
 
 ```bash
-mkdir -p ./.data
-[ -f ./.data/auth_secret ] || openssl rand -base64 32 > ./.data/auth_secret
+if [ ! -d ./.data ]; then
+  mkdir -p ./.data
+  [ -f ./.data/auth_secret ] || openssl rand -base64 32 > ./.data/auth_secret
+fi
 
 export ENTRANCE_DATA_DIR="$(pwd)/.data"
 export AUTH_SECRET="$(tr -d '\n' < ./.data/auth_secret)"
 npm start
 ```
 
-This example pins runtime data to `./.data` and lets Entrance generate and reuse the SSH credential encryption key in `./.data/.ssh_password_key`. Do not regenerate `SSH_PASSWORD_KEY` before each restart, or existing allowlists, passwords, and private keys will become undecryptable.
+This matches `./start.sh`: if `./.data` already exists, the script does not regenerate `./.data/auth_secret`, so make sure that file is still present before restarting. The runtime data stays pinned to `./.data`, and Entrance generates and reuses the SSH credential encryption key in `./.data/.ssh_password_key`. Do not regenerate `SSH_PASSWORD_KEY` before each restart, or existing allowlists, passwords, and private keys will become undecryptable.
 
 The default account is `admin/admin` on first boot.
 
@@ -294,6 +300,7 @@ podman run -d --name entrance-tools \
 ├── vnc.js               # VNC proxy module
 ├── nginx/               # Reverse proxy example config
 ├── package.json         # Dependency manifest
+├── start.sh             # Local startup helper that exports ENTRANCE_DATA_DIR and AUTH_SECRET from ./.data
 ├── users.json           # User data (generated, may live under ENTRANCE_DATA_DIR)
 ├── .ssh_password_key    # SSH credential encryption key (generated)
 ├── LOGIN_KEEP           # Encrypted password-login timestamp for session keepalive

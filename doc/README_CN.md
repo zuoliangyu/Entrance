@@ -146,17 +146,21 @@ cd Entrance
 # 安装依赖
 npm install
 
-# 启动服务
-npm start
+# 使用 ./.data 里的持久化本地运行数据启动服务
+./start.sh
 ```
 
-`npm start` 现在会先从 `webui-src/` 重建模块化 WebUI，再启动服务。如果只想刷新生成后的前端静态资源，可单独执行 `npm run build:webui`。
+`./start.sh` 是推荐的本地启动入口。首次运行且 `./.data` 还不存在时，它会创建 `./.data`、写入 `./.data/auth_secret`、导出 `ENTRANCE_DATA_DIR` 和 `AUTH_SECRET`，然后再执行 `npm start`。
+
+`npm start` 仍然会先从 `webui-src/` 重建模块化 WebUI，再启动服务，但前提是你已经提前导出了 `AUTH_SECRET`。如果只想刷新生成后的前端静态资源，可单独执行 `npm run build:webui`。
 
 访问 http://localhost:3000，使用账号登录后进入工具面板。
 
 如需指定端口，可使用环境变量或命令行参数：
 
 ```bash
+PORT=4000 ./start.sh
+# 或者在已经导出 AUTH_SECRET 时
 PORT=4000 npm start
 # 或
 npm start -- --port 4000
@@ -164,18 +168,20 @@ npm start -- --port 4000
 
 此时访问 `http://localhost:4000`。
 
-### 最小运行示例
+### `start.sh` 的手动等价流程
 
 ```bash
-mkdir -p ./.data
-[ -f ./.data/auth_secret ] || openssl rand -base64 32 > ./.data/auth_secret
+if [ ! -d ./.data ]; then
+  mkdir -p ./.data
+  [ -f ./.data/auth_secret ] || openssl rand -base64 32 > ./.data/auth_secret
+fi
 
 export ENTRANCE_DATA_DIR="$(pwd)/.data"
 export AUTH_SECRET="$(tr -d '\n' < ./.data/auth_secret)"
 npm start
 ```
 
-上面的示例会把运行时数据固定到 `./.data`，并让 Entrance 在 `./.data/.ssh_password_key` 中自动生成并复用 SSH 凭据加密密钥。不要在每次重启前重新生成 `SSH_PASSWORD_KEY`，否则历史白名单、密码和私钥将无法解密。
+这与 `./start.sh` 的行为一致：如果 `./.data` 已经存在，脚本不会重新生成 `./.data/auth_secret`，所以重启前要确保这个文件仍然存在。运行时数据会固定在 `./.data`，Entrance 也会在 `./.data/.ssh_password_key` 中自动生成并复用 SSH 凭据加密密钥。不要在每次重启前重新生成 `SSH_PASSWORD_KEY`，否则历史白名单、密码和私钥将无法解密。
 
 默认账号为 `admin/admin`（首次启动自动生成）。
 
@@ -293,6 +299,7 @@ podman run -d --name entrance-tools \
 ├── vnc.js               # VNC 代理模块
 ├── nginx/               # 反向代理示例配置
 ├── package.json         # 依赖配置
+├── start.sh             # 本地启动辅助脚本，从 ./.data 导出 ENTRANCE_DATA_DIR 和 AUTH_SECRET
 ├── users.json           # 用户数据（自动生成，可位于 ENTRANCE_DATA_DIR）
 ├── .ssh_password_key    # SSH 凭据加密密钥（自动生成）
 ├── LOGIN_KEEP           # 用于登录保持的密码登录时间戳（已加密）

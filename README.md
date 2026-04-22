@@ -5,11 +5,6 @@ Default documentation is in English. For Simplified Chinese, see [doc/README_CN.
 Web-based server management tools with SSH terminal access, local shell terminal access, VNC remote desktop, WebSerial terminal support, flashing/debugging workflows, and SFTP file management. The UI follows Microsoft Fluent Design, supports light/dark themes, and includes both Chinese and English interface modes.
 ![Screenshot](doc/screenshot.png)
 
-## Friend Links
-
-- EK-OmniProbe https://github.com/EmbeddedKitOrg/EK-OmniProbe
-- Clion-Waveform-Plotter https://github.com/Szturin/Clion-Waveform-Plotter
-
 ## Features
 
 ### SSH Terminal
@@ -108,6 +103,10 @@ Web-based server management tools with SSH terminal access, local shell terminal
 ### UI Features
 - Microsoft Fluent Design
 - Light / dark theme toggle
+- **Staged Startup Splash**
+  - When a saved login is restored and `ENTRANCE_DESKTOP_NOLOGIN` is not enabled, the app shows a Material You style wave splash with the rounded `logo.png` card
+  - The splash keeps a minimum 3-second progress animation even when boot is fast
+  - The dashboard shell renders first, then terminal/serial/VNC/local-shell/security modules initialize in stages
 - **Material You Color Schemes** - 6 optional accent themes
   - Default (neutral graphite)
   - Sakura (soft petals)
@@ -126,6 +125,8 @@ Web-based server management tools with SSH terminal access, local shell terminal
 ### Settings
 - **Change Password** - users can change their own login password in Settings (Argon2id hashed)
 - When `ENTRANCE_DESKTOP_NOLOGIN=1`, password changes are disabled and a notice is shown
+- **Session Keepalive** - default password-login keepalive is 7 days; users can change it from Settings with presets (`7d`, `14d`, `1m`, `never`) or custom expressions
+- Saved sessions remain reusable across restarts as long as `AUTH_SECRET` stays unchanged; changing `AUTH_SECRET` forces a fresh sign-in
 - **Private Network Allowlist** - administrators can open a dedicated card below the password card in Settings to manage private CIDR ranges for SSH, SFTP, and VNC
 - **Color Scheme Switching** - choose a Material You style accent scheme in Settings, saved automatically
 - **Language Switching** - switch the UI language from a dedicated card below the color scheme card; default is English, currently supports Chinese and English
@@ -149,6 +150,8 @@ npm install
 # Start the service
 npm start
 ```
+
+`npm start` now rebuilds the modular WebUI from `webui-src/` before launching the server. Use `npm run build:webui` if you only want to refresh the generated frontend assets.
 
 Visit http://localhost:3000 and sign in to enter the dashboard.
 
@@ -255,16 +258,20 @@ podman run -d --name entrance-tools \
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP listening port; can also be overridden with `npm start -- --port 4000` |
-| `ENTRANCE_DATA_DIR` | repository root | Persistent data directory containing `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, and `.ssh_password_key` |
+| `ENTRANCE_HOST` | `0.0.0.0` in web mode, `127.0.0.1` in desktop API-only mode | Explicit bind host override |
+| `ENTRANCE_DATA_DIR` | repository root | Persistent data directory containing `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, `.ssh_password_key`, and `LOGIN_KEEP` |
 | `AUTH_SECRET` | none, required | Signing key for auth tokens; must be at least 32 bytes (base64 or 64 hex chars) |
 | `SSH_PASSWORD_KEY` | auto-generates `.ssh_password_key` when unset | 32-byte key used to encrypt SSH/SFTP credentials and the private network allowlist; if set manually, it must remain stable across restarts |
-| `AUTH_TOKEN_TTL` | `43200` | Auth token lifetime in seconds |
+| `AUTH_TOKEN_TTL` | `604800` | Default auth token lifetime in seconds for password logins unless overridden by the Settings keepalive value |
 | `LOGIN_WINDOW_MS` | `900000` | Rate-limit window for failed logins in milliseconds |
 | `LOGIN_MAX_ATTEMPTS` | `5` | Maximum failed logins allowed during the rate-limit window |
 | `STRICT_HOST_KEY_CHECKING` | `false` | When `true`, reject unknown SSH host keys |
 | `ALLOWED_TARGETS` | empty | Comma-separated allowlist of target hosts, supports `*.example.com` |
 | `ALLOW_PRIVATE_NETWORKS` | `false` | When `true`, allow direct private-address access; otherwise admin allowlisting is required |
-| `ENTRANCE_DESKTOP_NOLOGIN` | `0` | When `1`, skip login and access the app directly as `admin`; recommended only in trusted environments |
+| `ENTRANCE_DESKTOP_NOLOGIN` | `0` | When `1`, enable desktop no-login. For a secure Electron deployment, pair it with `ENTRANCE_DESKTOP_API_ONLY=1` and a bootstrap secret instead of exposing the web UI |
+| `ENTRANCE_DESKTOP_API_ONLY` | `0` | When `1`, disable static WebUI serving and expose backend APIs only; intended for Electron wrappers that render local frontend assets |
+| `ENTRANCE_DESKTOP_ALLOWED_ORIGIN` | `app://entrance` | Allowed renderer origin for CORS when `ENTRANCE_DESKTOP_API_ONLY=1` |
+| `ENTRANCE_DESKTOP_BOOTSTRAP_SECRET` | empty | Required when `ENTRANCE_DESKTOP_API_ONLY=1` and `ENTRANCE_DESKTOP_NOLOGIN=1`; lets the desktop wrapper obtain the no-login admin token without exposing `/api/auth/nologin` to browsers |
 
 ## Project Structure
 
@@ -273,8 +280,14 @@ podman run -d --name entrance-tools \
 ├── compose.yml          # Docker Compose configuration
 ├── Dockerfile           # Docker image build file
 ├── public/              # Frontend static assets
-│   ├── index.html
+│   ├── assets/          # Generated CSS/JS bundles built from webui-src/
+│   ├── index.html       # Generated frontend entrypoint
 │   └── vnc-client.js
+├── webui-src/           # Editable WebUI source files and HTML partials
+│   ├── index.template.html
+│   ├── partials/
+│   ├── scripts/app.js
+│   └── styles/app.css
 ├── server.js            # Backend server
 ├── local-shell.js       # Cross-platform local shell module
 ├── flash-debug.js       # Local flash/debug module (OpenOCD / pyOCD / probe-rs)
@@ -283,12 +296,20 @@ podman run -d --name entrance-tools \
 ├── package.json         # Dependency manifest
 ├── users.json           # User data (generated, may live under ENTRANCE_DATA_DIR)
 ├── .ssh_password_key    # SSH credential encryption key (generated)
+├── LOGIN_KEEP           # Encrypted password-login timestamp for session keepalive
 ├── known_hosts.json     # SSH host fingerprints (generated)
 ├── private-networks.json  # Private network allowlist (generated, encrypted)
 └── userdata/            # User data directory (generated)
     ├── admin.json       # Saved hosts for admin
     └── user1.json       # Saved hosts for user1
 ```
+
+WebUI source is split by responsibility:
+
+- `webui-src/partials/auth-overlay.html` contains the login overlay plus the staged loading/splash markup.
+- `webui-src/styles/app.css` contains the auth overlay and startup animation styles.
+- `webui-src/scripts/app.js` contains the auth/loading controller (`showLoading`, `updateLoadingProgress`) and the staged dashboard boot sequence (`startDashboardBoot`).
+- `public/index.html` and `public/assets/*` are generated outputs from those source files.
 
 ## Technology Stack
 
@@ -316,6 +337,7 @@ podman run -d --name entrance-tools \
 
 ### Authentication
 - `POST /api/auth/login` - sign in and return a token
+- `POST /api/auth/session` - refresh the current token using a new keepalive duration
 - `POST /api/auth/verify` - verify a token
 
 All APIs require `Authorization: Bearer <token>` in the request header.
@@ -622,10 +644,14 @@ memory:[used:8192, free:4096, cached:2048]
 
 ## Security Notes
 
-- Login is enabled by default. Auth tokens are signed with `AUTH_SECRET`; login is skipped only when `ENTRANCE_DESKTOP_NOLOGIN=1`.
+- Login is enabled by default. Auth tokens are signed with `AUTH_SECRET`. If you enable desktop no-login, do it through `ENTRANCE_DESKTOP_API_ONLY=1` plus `ENTRANCE_DESKTOP_BOOTSTRAP_SECRET` so browsers cannot obtain the admin token from `/api/auth/nologin`.
+- Password-login keepalive defaults to 7 days and can be changed from Settings. The current preference is stored in browser local storage and can be refreshed immediately for the active session.
+- The browser keeps the saved login only while token verification succeeds and the current `AUTH_SECRET` fingerprint matches the one recorded for that session.
 - Passwords in `users.json` are stored as `Argon2id` hashes. Legacy plaintext passwords are migrated automatically after a successful login.
+- The last successful password-login timestamp is stored in `ENTRANCE_DATA_DIR/LOGIN_KEEP` and encrypted with AES-256-GCM using a key derived from `AUTH_SECRET`.
 - SSH/SFTP credentials, including passwords, private keys, and passphrases, are stored only in the browser or in server-side user data; when persisted, they are encrypted with AES-256-GCM using `SSH_PASSWORD_KEY`.
 - The private network allowlist is stored in `private-networks.json` and encrypted with AES-256-GCM using `SSH_PASSWORD_KEY`.
+- In desktop API-only mode the backend stops serving `public/index.html`, binds to loopback by default, and only exposes the admin no-login bootstrap through `POST /api/auth/desktop/bootstrap` with `X-Entrance-Desktop-Secret`.
 - If `SSH_PASSWORD_KEY` changes, historical encrypted credentials and allowlist entries become unreadable until the old key is restored or the data is re-entered.
 - **Local Shell Security** (Linux/macOS/Windows, admin only): local shell access gives direct terminal access to the server. Make sure to:
   - use it only on trusted networks
@@ -637,6 +663,11 @@ memory:[used:8192, free:4096, cached:2048]
   - keep executables such as `OpenOCD`, `pyOCD`, `probe-rs`, `pkexec`, `sudo`, and `gsudo` within a trusted supply chain
   - enable "request admin/root privileges" only when device access or driver permissions actually require it
   - when using Linux GUI password dialog mode, ensure `zenity` or `kdialog` comes from the system package manager
+
+### Friend Links
+
+- EK-OmniProbe https://github.com/EmbeddedKitOrg/EK-OmniProbe
+- Clion-Waveform-Plotter https://github.com/Szturin/Clion-Waveform-Plotter
 
 ## License
 

@@ -608,8 +608,8 @@ function applyElevationToPlan(plan) {
     };
 }
 
-function splitCliArgs(input) {
-    const source = normalizeString(input, '附加参数', MAX_PATH_LENGTH, { trim: false });
+function splitCliArgs(input, fieldName = '附加参数') {
+    const source = normalizeString(input, fieldName, MAX_PATH_LENGTH, { trim: false });
     if (!source) return [];
 
     const result = [];
@@ -662,6 +662,63 @@ function splitCliArgs(input) {
         result.push(current);
     }
     return result;
+}
+
+function normalizeExtraArgPosition(value = '') {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized || normalized === 'end' || normalized === 'append') {
+        return 'end';
+    }
+    if (
+        normalized === 'before_target'
+        || normalized === 'before-target'
+        || normalized === 'pre_target'
+        || normalized === 'pre-target'
+    ) {
+        return 'before_target';
+    }
+    if (
+        normalized === 'before_init'
+        || normalized === 'before-init'
+        || normalized === 'pre_init'
+        || normalized === 'pre-init'
+    ) {
+        return 'before_init';
+    }
+    if (normalized === 'before_tail' || normalized === 'before-reset' || normalized === 'before_reset') {
+        return 'before_tail';
+    }
+    throw new Error('附加参数插入位置无效');
+}
+
+function collectExtraArgBuckets(options = {}) {
+    const buckets = {
+        before_target: [],
+        before_init: [],
+        before_tail: [],
+        end: []
+    };
+    const entries = Array.isArray(options.extraArgEntries) ? options.extraArgEntries : [];
+
+    if (entries.length > 0) {
+        entries.forEach((entry, index) => {
+            if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+                throw new Error('附加参数格式无效');
+            }
+
+            const source = normalizeString(entry.value, '附加参数', MAX_PATH_LENGTH, { trim: false });
+            if (!source.trim()) {
+                return;
+            }
+
+            const position = normalizeExtraArgPosition(entry.position);
+            buckets[position].push(...splitCliArgs(source));
+        });
+        return buckets;
+    }
+
+    buckets.end.push(...splitCliArgs(options.extraArgs));
+    return buckets;
 }
 
 function escapeShellArg(arg) {
@@ -1405,7 +1462,9 @@ function buildOpenOcdCommand(action, options, executablePath = '') {
     const gdbPort = normalizeOptionalInteger(options.gdbPort, 'GDB 端口', { min: 1, max: 65535, fallback: 3333 });
     const telnetPort = normalizeOptionalInteger(options.telnetPort, 'Telnet 端口', { min: 1, max: 65535, fallback: 4444 });
     const args = [];
+    const tailArgs = [];
     const notes = [];
+    const extraArgBuckets = collectExtraArgBuckets(options);
 
     const resolvedInterfaceConfig = resolveOpenOcdInterfaceConfig(
         executablePath,
@@ -1422,31 +1481,32 @@ function buildOpenOcdCommand(action, options, executablePath = '') {
         args.push('-c', `espusbjtag chip_id ${espUsbBridgeChipId}`);
         notes.push(`已为 ESP USB Bridge 自动设置 chip_id=${espUsbBridgeChipId}。`);
     }
+    args.push(...extraArgBuckets.before_target);
+    if (speed) {
+        args.push('-c', `adapter speed ${speed}`);
+    }
     args.push('-f', normalizedTarget.value);
     if (normalizedTarget.rewritten) {
         notes.push(`已将 ${normalizedTarget.originalValue} 自动修正为 ${normalizedTarget.value}。`);
     }
-    if (speed) {
-        args.push('-c', `adapter speed ${speed}`);
-    }
 
     if (action === 'flash') {
+        args.push(...extraArgBuckets.before_init);
         args.push('-c', 'init');
         if (isEspOpenOcdTarget(normalizedTarget.value)) {
-            args.push('-c', buildOpenOcdEspFlashCommand(firmwarePath, verify, resetAfterFlash, notes));
+            tailArgs.push('-c', buildOpenOcdEspFlashCommand(firmwarePath, verify, resetAfterFlash, notes));
         } else {
-            args.push('-c', `program ${wrapTclValue(firmwarePath)}${verify ? ' verify' : ''}${resetAfterFlash ? ' reset' : ''} exit`);
+            tailArgs.push('-c', `program ${wrapTclValue(firmwarePath)}${verify ? ' verify' : ''}${resetAfterFlash ? ' reset' : ''} exit`);
         }
     } else {
         args.push('-c', `gdb_port ${gdbPort}`);
         args.push('-c', `telnet_port ${telnetPort}`);
+        args.push(...extraArgBuckets.before_init);
         args.push('-c', 'init');
-        args.push('-c', 'reset halt');
+        tailArgs.push('-c', 'reset halt');
         notes.push(`调试服务已准备，GDB 端口 ${gdbPort}，Telnet 端口 ${telnetPort}。`);
     }
-
-    const extraArgs = splitCliArgs(options.extraArgs);
-    args.push(...extraArgs);
+    args.push(...extraArgBuckets.before_tail, ...tailArgs, ...extraArgBuckets.end);
 
     return {
         args,
@@ -1466,10 +1526,15 @@ function buildPyOcdCommand(action, options) {
     const telnetPort = normalizeOptionalInteger(options.telnetPort, 'Telnet 端口', { min: 1, max: 65535, fallback: 4444 });
     const elfPath = normalizeString(options.elfPath, 'ELF 路径', MAX_PATH_LENGTH);
     const args = [];
+    const tailArgs = [];
     const notes = [];
+    const extraArgBuckets = collectExtraArgBuckets(options);
 
     if (action === 'flash') {
-        args.push('load', firmwarePath, '-t', target);
+        args.push('load', firmwarePath);
+        args.push(...extraArgBuckets.before_target);
+        args.push('-t', target);
+        args.push(...extraArgBuckets.before_init);
         if (probeSelection) {
             args.push('-u', probeSelection);
         }
@@ -1477,11 +1542,14 @@ function buildPyOcdCommand(action, options) {
             args.push('-f', speed);
         }
         if (!resetAfterFlash) {
-            args.push('--no-reset');
+            tailArgs.push('--no-reset');
         }
         notes.push('写后校验沿用 pyOCD 内置策略。');
     } else {
-        args.push('gdbserver', '-t', target, '-p', String(gdbPort), '-T', String(telnetPort));
+        args.push('gdbserver');
+        args.push(...extraArgBuckets.before_target);
+        args.push('-t', target, '-p', String(gdbPort), '-T', String(telnetPort));
+        args.push(...extraArgBuckets.before_init);
         if (probeSelection) {
             args.push('-u', probeSelection);
         }
@@ -1491,12 +1559,10 @@ function buildPyOcdCommand(action, options) {
         if (elfPath) {
             args.push('--elf', elfPath);
         }
-        args.push('--persist');
+        tailArgs.push('--persist');
         notes.push(`调试服务已准备，GDB 端口 ${gdbPort}，Telnet 端口 ${telnetPort}。`);
     }
-
-    const extraArgs = splitCliArgs(options.extraArgs);
-    args.push(...extraArgs);
+    args.push(...extraArgBuckets.before_tail, ...tailArgs, ...extraArgBuckets.end);
 
     return {
         args,
@@ -1515,10 +1581,15 @@ function buildProbeRsCommand(action, options) {
     const debugPort = normalizeOptionalInteger(options.gdbPort, '调试端口', { min: 1, max: 65535, fallback: 1337 });
     const elfPath = normalizeString(options.elfPath, 'ELF 路径', MAX_PATH_LENGTH);
     const args = [];
+    const tailArgs = [];
     const notes = [];
+    const extraArgBuckets = collectExtraArgBuckets(options);
 
     if (action === 'flash') {
-        args.push('download', firmwarePath, '--chip', target);
+        args.push('download', firmwarePath);
+        args.push(...extraArgBuckets.before_target);
+        args.push('--chip', target);
+        args.push(...extraArgBuckets.before_init);
         if (probeSelection) {
             args.push('--probe', probeSelection);
         }
@@ -1531,23 +1602,21 @@ function buildProbeRsCommand(action, options) {
         notes.push('probe-rs 的烧录使用 download 子命令，支持 bin/hex/elf 等文件。');
     } else {
         args.push('gdb', '--gdb-connection-string', `127.0.0.1:${debugPort}`);
+        args.push(...extraArgBuckets.before_target);
+        args.push('--chip', target);
+        args.push(...extraArgBuckets.before_init);
         if (probeSelection) {
             args.push('--probe', probeSelection);
-        }
-        if (target) {
-            args.push('--chip', target);
         }
         if (speed) {
             args.push('--speed', speed);
         }
         if (elfPath) {
-            args.push(elfPath);
+            tailArgs.push(elfPath);
         }
         notes.push(`GDB 调试服务已准备，监听端口 ${debugPort}。`);
     }
-
-    const extraArgs = splitCliArgs(options.extraArgs);
-    args.push(...extraArgs);
+    args.push(...extraArgBuckets.before_tail, ...tailArgs, ...extraArgBuckets.end);
 
     return {
         args,

@@ -1,0 +1,110 @@
+    <!-- Modal: 新建文件夹 -->
+    <div class="modal-overlay" id="mkdirModal">
+        <div class="modal">
+            <h3><i class="fas fa-folder-plus"></i> 新建文件夹</h3>
+            <div class="form-group">
+                <label>文件夹名称</label>
+                <input type="text" class="form-input" id="mkdirName" placeholder="新文件夹">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="mkdirCancel">取消</button>
+                <button class="btn" id="mkdirConfirm">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 杀进程 -->
+    <div class="modal-overlay" id="killModal">
+        <div class="modal">
+            <h3><i class="fas fa-skull-crossbones"></i> 终止进程</h3>
+            <input type="hidden" id="killPid">
+            <div class="form-group">
+                <label>进程信息</label>
+                <div class="kill-process-info">
+                    <div class="kill-info-row"><span>PID:</span> <strong id="killPidDisplay">--</strong></div>
+                    <div class="kill-info-row"><span>用户:</span> <strong id="killUserDisplay">--</strong></div>
+                    <div class="kill-info-row"><span>命令:</span> <code id="killCmdDisplay">--</code></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>选择信号</label>
+                <div class="signal-options">
+                    <label class="signal-option">
+                        <input type="radio" name="killSignal" value="15" checked>
+                        <span class="signal-label">
+                            <strong>SIGTERM (15)</strong>
+                            <small>优雅终止，允许进程清理</small>
+                        </span>
+                    </label>
+                    <label class="signal-option">
+                        <input type="radio" name="killSignal" value="9">
+                        <span class="signal-label">
+                            <strong>SIGKILL (9)</strong>
+                            <small>强制终止，立即杀死进程</small>
+                        </span>
+                    </label>
+                    <label class="signal-option">
+                        <input type="radio" name="killSignal" value="2">
+                        <span class="signal-label">
+                            <strong>SIGINT (2)</strong>
+                            <small>中断信号，类似 Ctrl+C</small>
+                        </span>
+                    </label>
+                    <label class="signal-option">
+                        <input type="radio" name="killSignal" value="1">
+                        <span class="signal-label">
+                            <strong>SIGHUP (1)</strong>
+                            <small>挂起信号，常用于重载配置</small>
+                        </span>
+                    </label>
+                    <label class="signal-option">
+                        <input type="radio" name="killSignal" value="19">
+                        <span class="signal-label">
+                            <strong>SIGSTOP (19)</strong>
+                            <small>暂停进程</small>
+                        </span>
+                    </label>
+                    <label class="signal-option">
+                        <input type="radio" name="killSignal" value="18">
+                        <span class="signal-label">
+                            <strong>SIGCONT (18)</strong>
+                            <small>继续已暂停的进程</small>
+                        </span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="killCancel">取消</button>
+                <button class="btn btn-danger" id="killConfirm"><i class="fas fa-skull"></i> 发送信号</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 关于 -->
+    <div class="modal-overlay" id="aboutModal">
+        <div class="modal">
+            <h3><i class="fas fa-circle-info"></i> 关于</h3>
+            <div class="about-modal-content">
+                <div class="about-item">
+                    <span class="about-label">版本号</span>
+                    <strong id="aboutVersionValue">0.2.0-alpha</strong>
+                </div>
+                <div class="about-item">
+                    <span class="about-label">项目信息</span>
+                    <a class="about-link" id="aboutProjectHomepageLink" href="https://github.com/fcanlnony/Entrance" target="_blank" rel="noopener noreferrer">https://github.com/fcanlnony/Entrance</a>
+                </div>
+                <div class="about-item" id="aboutDesktopVersionItem" style="display:none">
+                    <span class="about-label">桌面客户端版本</span>
+                    <strong id="aboutDesktopVersionValue">未设置</strong>
+                </div>
+                <div class="about-item" id="aboutDesktopHomepageItem" style="display:none">
+                    <span class="about-label">桌面客户端项目主页</span>
+                    <a class="about-link" id="aboutDesktopHomepageLink" href="https://github.com/EntranceToolBox/Entrance-Desktop" target="_blank" rel="noopener noreferrer">https://github.com/EntranceToolBox/Entrance-Desktop</a>
+                </div>
+                <p class="about-note">欢迎提交issue和pr</p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="aboutClose">关闭</button>
+            </div>
+        </div>
+    </div>

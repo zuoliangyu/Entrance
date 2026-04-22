@@ -5,11 +5,6 @@
 基于 Web 的服务器管理工具，支持 SSH 终端、本地 Shell 终端、VNC 远程桌面、WebSerial 串口终端、烧录调试和 SFTP 文件管理。采用 Microsoft Fluent Design 设计风格，支持亮色/暗色主题，并提供中文/英文界面切换。
 ![Screenshot](screenshot_cn.png)
 
-## 友链
-
-- EK-OmniProbe https://github.com/EmbeddedKitOrg/EK-OmniProbe
-- Clion-Waveform-Plotter https://github.com/Szturin/Clion-Waveform-Plotter
-
 ## 功能特性
 
 ### SSH 终端
@@ -107,6 +102,10 @@
 ### 界面特性
 - Microsoft Fluent Design 设计风格
 - 亮色/暗色主题切换
+- **分阶段启动动画**
+  - 当存在可恢复的登录态且未启用 `ENTRANCE_DESKTOP_NOLOGIN=1` 时，界面会显示 Material You 风格的波浪启动页，并在中央展示带圆角矩形裁剪的 `logo.png`
+  - 即使启动很快，也会保留至少 3 秒的进度条动画
+  - 启动顺序为先渲染前端工作台外壳，再分阶段初始化终端、串口、VNC、本机 Shell 与安全设置等模块
 - **Material You 配色方案** - 6 套可选强调色方案
   - 默认方案（中性石墨）
   - 樱花粉（柔和花瓣）
@@ -125,6 +124,8 @@
 ### 设置
 - **修改密码** - 用户可在设置页面修改自己的登录密码（Argon2id 加密）
 - 当 `ENTRANCE_DESKTOP_NOLOGIN=1` 时，密码修改功能禁用并显示提示
+- **登录保持** - 密码登录默认保持 7 天，可在设置页使用预设（`7d`、`14d`、`1m`、`never`）或自定义表达式修改
+- 只要 `AUTH_SECRET` 保持不变，重启后仍可复用已保存的登录态；若 `AUTH_SECRET` 改变，则会强制重新登录
 - **内网白名单** - 管理员可在设置页中通过位于修改密码卡片下方的独立卡片管理 SSH、SFTP、VNC 使用的私有网段白名单
 - **配色方案切换** - 在设置页面选择 Material You Design 风格的配色方案，选择自动保存
 - **语言切换** - 在设置页面配色方案下方的独立卡片中切换界面语言，默认英文，当前支持中文和英文
@@ -148,6 +149,8 @@ npm install
 # 启动服务
 npm start
 ```
+
+`npm start` 现在会先从 `webui-src/` 重建模块化 WebUI，再启动服务。如果只想刷新生成后的前端静态资源，可单独执行 `npm run build:webui`。
 
 访问 http://localhost:3000，使用账号登录后进入工具面板。
 
@@ -254,16 +257,20 @@ podman run -d --name entrance-tools \
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP 服务监听端口，也可通过 `npm start -- --port 4000` 覆盖 |
-| `ENTRANCE_DATA_DIR` | 项目根目录 | 持久化数据目录，包含 `users.json`、`userdata/`、`known_hosts.json`、`private-networks.json`、`.ssh_password_key` |
+| `ENTRANCE_HOST` | Web 模式为 `0.0.0.0`，桌面 API-only 模式为 `127.0.0.1` | 显式指定监听地址 |
+| `ENTRANCE_DATA_DIR` | 项目根目录 | 持久化数据目录，包含 `users.json`、`userdata/`、`known_hosts.json`、`private-networks.json`、`.ssh_password_key`、`LOGIN_KEEP` |
 | `AUTH_SECRET` | 无，必填 | 登录 token 签名密钥，要求至少 32 字节（base64 或 64 字符十六进制） |
 | `SSH_PASSWORD_KEY` | 未设置时自动生成 `.ssh_password_key` | 用于加密 SSH/SFTP 凭据与私有网络白名单的 32 字节密钥；如果手动设置，必须在重启后保持不变 |
-| `AUTH_TOKEN_TTL` | `43200` | 登录 token 有效期（秒） |
+| `AUTH_TOKEN_TTL` | `604800` | 密码登录默认 token 有效期（秒）；可被设置页中的登录保持时间覆盖 |
 | `LOGIN_WINDOW_MS` | `900000` | 登录失败限流时间窗口（毫秒） |
 | `LOGIN_MAX_ATTEMPTS` | `5` | 时间窗口内允许的最大失败登录次数 |
 | `STRICT_HOST_KEY_CHECKING` | `false` | 设为 `true` 时拒绝未知 SSH 主机指纹 |
 | `ALLOWED_TARGETS` | 空 | 允许连接的目标主机白名单，逗号分隔，支持 `*.example.com` |
 | `ALLOW_PRIVATE_NETWORKS` | `false` | 设为 `true` 时允许直接访问私有地址；否则需通过管理员白名单放行 |
-| `ENTRANCE_DESKTOP_NOLOGIN` | `0` | 设为 `1` 时跳过登录，直接以 `admin` 身份访问，仅建议在受信任环境使用 |
+| `ENTRANCE_DESKTOP_NOLOGIN` | `0` | 设为 `1` 时启用桌面免登录。若要在 Electron 中安全使用，建议配合 `ENTRANCE_DESKTOP_API_ONLY=1` 和引导密钥，而不是继续暴露网页 UI |
+| `ENTRANCE_DESKTOP_API_ONLY` | `0` | 设为 `1` 时关闭静态 WebUI，只暴露后端 API；用于由 Electron wrapper 本地渲染前端的场景 |
+| `ENTRANCE_DESKTOP_ALLOWED_ORIGIN` | `app://entrance` | `ENTRANCE_DESKTOP_API_ONLY=1` 时允许访问 API 的渲染端 Origin |
+| `ENTRANCE_DESKTOP_BOOTSTRAP_SECRET` | 空 | 当 `ENTRANCE_DESKTOP_API_ONLY=1` 且 `ENTRANCE_DESKTOP_NOLOGIN=1` 时必填；用于让桌面 wrapper 安全获取免登录 admin token，而不把 `/api/auth/nologin` 暴露给浏览器 |
 
 ## 项目结构
 
@@ -272,8 +279,14 @@ podman run -d --name entrance-tools \
 ├── compose.yml          # Docker Compose 配置
 ├── Dockerfile           # Docker 镜像构建文件
 ├── public/              # 前端静态资源
-│   ├── index.html
+│   ├── assets/          # 由 webui-src/ 生成的 CSS/JS 产物
+│   ├── index.html       # 生成后的前端入口
 │   └── vnc-client.js
+├── webui-src/           # 可编辑的 WebUI 源文件与 HTML 分块
+│   ├── index.template.html
+│   ├── partials/
+│   ├── scripts/app.js
+│   └── styles/app.css
 ├── server.js            # 后端服务器
 ├── local-shell.js       # 本地 Shell 模块（跨平台）
 ├── flash-debug.js       # 本机烧录/调试模块（OpenOCD / pyOCD / probe-rs）
@@ -282,12 +295,20 @@ podman run -d --name entrance-tools \
 ├── package.json         # 依赖配置
 ├── users.json           # 用户数据（自动生成，可位于 ENTRANCE_DATA_DIR）
 ├── .ssh_password_key    # SSH 凭据加密密钥（自动生成）
+├── LOGIN_KEEP           # 用于登录保持的密码登录时间戳（已加密）
 ├── known_hosts.json     # SSH 主机指纹（自动生成）
 ├── private-networks.json  # 私有网络白名单（自动生成，已加密）
 └── userdata/            # 用户数据目录（自动生成）
     ├── admin.json       # admin 的主机列表
     └── user1.json       # user1 的主机列表
 ```
+
+WebUI 源码按职责拆分：
+
+- `webui-src/partials/auth-overlay.html` 放登录遮罩与分阶段加载/启动页的 HTML 结构。
+- `webui-src/styles/app.css` 放认证遮罩与启动动画相关样式。
+- `webui-src/scripts/app.js` 放认证/加载控制逻辑（`showLoading`、`updateLoadingProgress`）以及工作台分阶段启动流程（`startDashboardBoot`）。
+- `public/index.html` 与 `public/assets/*` 都是由上述源文件生成的产物。
 
 ## 技术栈
 
@@ -315,6 +336,7 @@ podman run -d --name entrance-tools \
 
 ### 认证
 - `POST /api/auth/login` - 登录并返回 token
+- `POST /api/auth/session` - 使用新的登录保持时间刷新当前 token
 - `POST /api/auth/verify` - 校验 token
 
 所有 API 需在请求头携带 `Authorization: Bearer <token>`。
@@ -621,10 +643,14 @@ memory:[used:8192, free:4096, cached:2048]
 
 ## 安全说明
 
-- 登录默认启用，登录 token 使用 `AUTH_SECRET` 进行签名；仅在 `ENTRANCE_DESKTOP_NOLOGIN=1` 时跳过登录流程。
+- 登录默认启用，登录 token 使用 `AUTH_SECRET` 进行签名。若要启用桌面免登录，建议配合 `ENTRANCE_DESKTOP_API_ONLY=1` 和 `ENTRANCE_DESKTOP_BOOTSTRAP_SECRET`，避免浏览器通过 `/api/auth/nologin` 直接拿到 admin token。
+- 密码登录默认保持 7 天，可在设置页修改；当前偏好保存在浏览器本地存储，并可立即刷新当前会话。
+- 浏览器仅会在 token 校验成功且当前 `AUTH_SECRET` 指纹与该会话记录一致时继续复用本地登录态。
 - `users.json` 中的密码使用 `Argon2id` 哈希存储；旧版明文密码会在用户成功登录后自动迁移。
+- 最近一次密码登录的 Unix 时间戳保存在 `ENTRANCE_DATA_DIR/LOGIN_KEEP` 中，并使用基于 `AUTH_SECRET` 派生密钥的 AES-256-GCM 加密。
 - SSH/SFTP 凭据（密码、私钥、私钥口令）仅保存在用户浏览器本地或服务端用户数据中，服务端落盘会使用 `SSH_PASSWORD_KEY` 进行 AES-256-GCM 加密。
 - 私有网络白名单存储在 `private-networks.json` 中，服务端落盘同样使用 `SSH_PASSWORD_KEY` 进行 AES-256-GCM 加密。
+- 在桌面 API-only 模式下，后端默认只绑定到 loopback，不再提供 `public/index.html`，并且只有携带 `X-Entrance-Desktop-Secret` 的 `POST /api/auth/desktop/bootstrap` 才能拿到 admin 免登录 token。
 - `SSH_PASSWORD_KEY` 变更后，历史已加密凭据和白名单将无法解密；需要恢复原密钥或重新录入数据。
 - **本地 Shell 安全提示**（Linux/macOS/Windows，仅管理员可用）：本地 Shell 功能允许直接访问服务器终端，请确保：
   - 仅在受信任的网络环境中使用
@@ -636,6 +662,11 @@ memory:[used:8192, free:4096, cached:2048]
   - 将 `OpenOCD`、`pyOCD`、`probe-rs`、`pkexec`、`sudo`、`gsudo` 等可执行文件来源控制在可信范围
   - 仅在确有设备访问或驱动权限需求时启用“请求管理员/root 权限”
   - 若使用 Linux 图形密码对话框模式，请确认 `zenity` 或 `kdialog` 来自系统包管理器
+
+### 友链
+
+- EK-OmniProbe https://github.com/EmbeddedKitOrg/EK-OmniProbe
+- Clion-Waveform-Plotter https://github.com/Szturin/Clion-Waveform-Plotter
 
 ## 许可证
 

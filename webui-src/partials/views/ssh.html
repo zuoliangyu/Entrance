@@ -1,0 +1,241 @@
+            <div class="view active" id="view-ssh">
+                <div class="header"><h2><i class="fas fa-terminal"></i> SSH 终端</h2></div>
+                <div class="content">
+                    <div class="toolbar">
+                        <div class="input-group">
+                            <label>主机地址</label>
+                            <input type="text" class="form-input" id="sshHost" placeholder="192.168.1.100">
+                        </div>
+                        <div class="input-group">
+                            <label>端口</label>
+                            <input type="number" class="form-input" id="sshPort" value="22" style="width:70px">
+                        </div>
+                        <div class="input-group">
+                            <label>用户名</label>
+                            <input type="text" class="form-input" id="sshUser" placeholder="root">
+                        </div>
+                        <div class="input-group">
+                            <label>认证方式</label>
+                            <select class="form-input" id="sshAuthType">
+                                <option value="password" selected>密码</option>
+                                <option value="key">私钥</option>
+                            </select>
+                        </div>
+                        <div class="input-group" id="sshPasswordGroup">
+                            <label>密码</label>
+                            <input type="password" class="form-input" id="sshPass" placeholder="密码" maxlength="2048">
+                        </div>
+                        <div class="auth-key-panel" id="sshKeyPanel">
+                            <div class="input-group key-input-group">
+                                <label>私钥</label>
+                                <textarea class="form-input key-input" id="sshPrivateKey" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" maxlength="65536" spellcheck="false"></textarea>
+                            </div>
+                            <div class="input-group">
+                                <label>私钥口令（可选）</label>
+                                <input type="password" class="form-input" id="sshPassphrase" placeholder="私钥口令" maxlength="4096">
+                            </div>
+                        </div>
+                        <div class="input-group" style="justify-content:flex-end; gap: 8px;">
+                            <label>&nbsp;</label>
+                            <button class="btn btn-secondary" id="cancelEditHostBtn" style="display:none"><i class="fas fa-times"></i> 取消编辑</button>
+                            <button class="btn" id="saveHostBtn"><i class="fas fa-plus"></i> 保存主机</button>
+                        </div>
+                    </div>
+                    <div class="hosts-section">
+                        <h3>已保存的主机</h3>
+                        <div class="hosts-grid" id="hostsGrid"></div>
+                    </div>
+                    <div class="terminal-box">
+                        <div class="terminal-header">
+                            <span class="terminal-title" id="termTitle">终端 - 未连接</span>
+                            <div class="terminal-status disconnected" id="termStatus"><i class="fas fa-circle"></i><span>未连接</span></div>
+                        </div>
+                        <div class="terminal-screen" id="terminal"></div>
+                    </div>
+                    <!-- System Stats Monitor -->
+                    <div class="sys-stats-container" id="sysStatsContainer">
+                        <div class="sys-stats-hint" id="sysStatsHint">
+                            <div class="hint-stats">
+                                <div class="hint-stat hint-cpu">
+                                    <i class="fas fa-microchip"></i>
+                                    <span>CPU:</span>
+                                    <span id="statCpuValue">--%</span>
+                                </div>
+                                <div class="hint-stat hint-mem">
+                                    <i class="fas fa-memory"></i>
+                                    <span>内存:</span>
+                                    <span id="statMemValue">--%</span>
+                                </div>
+                                <div class="hint-stat hint-disk">
+                                    <i class="fas fa-hdd"></i>
+                                    <span>I/O:</span>
+                                    <span id="statDiskValue">-- KB/s</span>
+                                </div>
+                            </div>
+                            <div class="hint-expand">
+                                <span>展开图表</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                        </div>
+                        <div class="sys-stats-panel">
+                            <div class="sys-stats-header">
+                                <div class="sys-stats-controls">
+                                    <button class="btn btn-sm btn-secondary" id="sysStatsClearBtn" title="清除数据"><i class="fas fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-secondary" id="sysStatsCloseBtn" title="收起"><i class="fas fa-chevron-up"></i></button>
+                                </div>
+                            </div>
+                            <div class="sys-stats-chart-wrapper">
+                                <canvas id="sysStatsCanvas"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- TOP Panel -->
+                    <div class="top-panel-container" id="topPanelContainer">
+                        <div class="top-panel-hint" id="topPanelHint">
+                            <div class="hint-info">
+                                <div class="hint-item hint-procs">
+                                    <i class="fas fa-tasks"></i>
+                                    <span>进程:</span>
+                                    <span id="topProcsValue">--</span>
+                                </div>
+                                <div class="hint-item hint-running">
+                                    <i class="fas fa-play-circle"></i>
+                                    <span>运行:</span>
+                                    <span id="topRunningValue">--</span>
+                                </div>
+                                <div class="hint-item hint-load">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    <span>负载:</span>
+                                    <span id="topLoadValue">--</span>
+                                </div>
+                            </div>
+                            <div class="hint-expand">
+                                <span>展开进程</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                        </div>
+                        <div class="top-panel-content">
+                            <div class="top-panel-header">
+                                <h4><i class="fas fa-list-alt"></i> 进程列表 (TOP)</h4>
+                                <div class="top-panel-controls">
+                                    <label>排序:
+                                        <select id="topSortBy">
+                                            <option value="cpu">CPU%</option>
+                                            <option value="mem">内存%</option>
+                                            <option value="pid">PID</option>
+                                            <option value="time">时间</option>
+                                        </select>
+                                    </label>
+                                    <label>显示:
+                                        <select id="topShowCount">
+                                            <option value="15">15</option>
+                                            <option value="30" selected>30</option>
+                                            <option value="50">50</option>
+                                            <option value="100">100</option>
+                                        </select>
+                                    </label>
+                                    <button class="btn btn-sm btn-secondary" id="topRefreshBtn" title="刷新"><i class="fas fa-sync-alt"></i></button>
+                                    <button class="btn btn-sm btn-secondary" id="topCloseBtn" title="收起"><i class="fas fa-chevron-up"></i></button>
+                                </div>
+                            </div>
+                            <div class="top-panel-summary" id="topSummary">
+                                <div class="top-summary-item">
+                                    <span class="top-summary-label">运行时间</span>
+                                    <span class="top-summary-value" id="topUptime">--</span>
+                                </div>
+                                <div class="top-summary-item">
+                                    <span class="top-summary-label">用户数</span>
+                                    <span class="top-summary-value" id="topUsers">--</span>
+                                </div>
+                                <div class="top-summary-item">
+                                    <span class="top-summary-label">负载均值</span>
+                                    <span class="top-summary-value" id="topLoadAvg">--</span>
+                                </div>
+                                <div class="top-summary-item">
+                                    <span class="top-summary-label">任务</span>
+                                    <span class="top-summary-value" id="topTasks">--</span>
+                                </div>
+                                <div class="top-summary-item">
+                                    <span class="top-summary-label">CPU使用</span>
+                                    <span class="top-summary-value" id="topCpuUsage">--</span>
+                                </div>
+                                <div class="top-summary-item">
+                                    <span class="top-summary-label">内存</span>
+                                    <span class="top-summary-value" id="topMemUsage">--</span>
+                                </div>
+                            </div>
+                            <div class="top-panel-table-wrapper">
+                                <table class="top-panel-table" id="topTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-pid" data-sort="pid">PID</th>
+                                            <th class="col-user" data-sort="user">USER</th>
+                                            <th class="col-cpu" data-sort="cpu">%CPU</th>
+                                            <th class="col-mem" data-sort="mem">%MEM</th>
+                                            <th class="col-vsz" data-sort="vsz">VSZ</th>
+                                            <th class="col-rss" data-sort="rss">RSS</th>
+                                            <th class="col-stat" data-sort="stat">STAT</th>
+                                            <th class="col-time" data-sort="time">TIME</th>
+                                            <th class="col-cmd" data-sort="cmd">COMMAND</th>
+                                            <th class="col-action">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="topTableBody">
+                                        <tr><td colspan="10" style="text-align:center;color:var(--color-text-3);padding:20px">连接SSH后自动获取进程信息</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Docker Stats Panel -->
+                    <div class="docker-panel-container" id="dockerPanelContainer">
+                        <div class="docker-panel-hint" id="dockerPanelHint">
+                            <div class="hint-info">
+                                <div class="hint-item hint-docker-count">
+                                    <i class="fab fa-docker"></i>
+                                    <span>容器:</span>
+                                    <span id="dockerContainerCountValue">--</span>
+                                </div>
+                                <div class="hint-item hint-docker-cpu">
+                                    <i class="fas fa-microchip"></i>
+                                    <span>CPU:</span>
+                                    <span id="dockerCpuHintValue">--</span>
+                                </div>
+                                <div class="hint-item hint-docker-mem">
+                                    <i class="fas fa-memory"></i>
+                                    <span>内存:</span>
+                                    <span id="dockerMemHintValue">--</span>
+                                </div>
+                            </div>
+                            <div class="hint-expand">
+                                <span>展开 Docker</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                        </div>
+                        <div class="docker-panel-content">
+                            <div class="docker-panel-header">
+                                <div class="docker-panel-header-left">
+                                    <h4><i class="fab fa-docker"></i> Docker Stats</h4>
+                                    <div class="docker-mode-switch" id="dockerModeSwitch">
+                                        <button type="button" class="docker-mode-tag active" data-mode="total">总计</button>
+                                        <button type="button" class="docker-mode-tag" data-mode="single">详细</button>
+                                    </div>
+                                </div>
+                                <div class="docker-panel-controls">
+                                    <span class="docker-panel-status" id="dockerPanelStatus">连接 SSH 后自动获取容器信息</span>
+                                    <button class="btn btn-sm btn-secondary" id="dockerRefreshBtn" title="刷新"><i class="fas fa-sync-alt"></i></button>
+                                    <button class="btn btn-sm btn-secondary" id="dockerCloseBtn" title="收起"><i class="fas fa-chevron-up"></i></button>
+                                </div>
+                            </div>
+                            <div class="docker-panel-body" id="dockerPanelBody">
+                                <div class="docker-container-list" id="dockerContainerList"></div>
+                                <div class="docker-metrics-grid" id="dockerMetricsGrid">
+                                    <div class="docker-panel-empty">连接 SSH 后自动获取 Docker Stats</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Local Shell -->

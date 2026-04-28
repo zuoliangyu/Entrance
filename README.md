@@ -149,9 +149,13 @@ npm install
 
 # Start the service with persistent local runtime data under ./.data
 ./start.sh
+# or use permissive CORS for LAN / reverse-proxy / tunnel browser access
+./start_nocors.sh
 ```
 
-`./start.sh` is the preferred local entry point. On the first run, when `./.data` does not exist yet, it creates `./.data`, writes `./.data/auth_secret`, exports `ENTRANCE_DATA_DIR` and `AUTH_SECRET`, and then runs `npm start`.
+`./start.sh` is the preferred local entry point. On the first run, when `./.data` does not exist yet, it creates `./.data`, writes `./.data/auth_secret`, exports `ENTRANCE_DATA_DIR` and `AUTH_SECRET`, and then runs `npm start`. It also accepts `--port=4000`, which makes it call `npm start -- --port 4000`.
+
+`./start_nocors.sh` is the same bootstrap flow with `ENTRANCE_CORS_DISABLE=1` exported first. Use it only when you intentionally need browser access from a LAN IP, reverse proxy, or tunnel domain.
 
 `npm start` still rebuilds the modular WebUI from `webui-src/` before launching the server, but it requires `AUTH_SECRET` to already be exported. Use `npm run build:webui` if you only want to refresh the generated frontend assets.
 
@@ -160,7 +164,9 @@ Visit http://localhost:3000 and sign in to enter the dashboard.
 To use a different port, use an environment variable or CLI flag:
 
 ```bash
-PORT=4000 ./start.sh
+./start.sh --port=4000
+# or
+./start_nocors.sh --port=4000
 # or, if AUTH_SECRET is already exported
 PORT=4000 npm start
 # or
@@ -182,7 +188,7 @@ export AUTH_SECRET="$(tr -d '\n' < ./.data/auth_secret)"
 npm start
 ```
 
-This matches `./start.sh`: if `./.data` already exists, the script does not regenerate `./.data/auth_secret`, so make sure that file is still present before restarting. The runtime data stays pinned to `./.data`, and Entrance generates and reuses the SSH credential encryption key in `./.data/.ssh_password_key`. Do not regenerate `SSH_PASSWORD_KEY` before each restart, or existing allowlists, passwords, and private keys will become undecryptable.
+This matches `./start.sh` without a custom port. If you run `./start.sh --port=4000`, the final line becomes `npm start -- --port 4000`. If `./.data` already exists, the script does not regenerate `./.data/auth_secret`, so make sure that file is still present before restarting. The runtime data stays pinned to `./.data`, and Entrance generates and reuses the SSH credential encryption key in `./.data/.ssh_password_key`. Do not regenerate `SSH_PASSWORD_KEY` before each restart, or existing allowlists, passwords, and private keys will become undecryptable.
 
 The default account is `admin/admin` on first boot.
 
@@ -303,7 +309,8 @@ For behavior-focused notes, defaults, side effects, and deployment guidance, see
 ├── vnc.js               # VNC proxy module
 ├── nginx/               # Reverse proxy example config
 ├── package.json         # Dependency manifest
-├── start.sh             # Local startup helper that exports ENTRANCE_DATA_DIR and AUTH_SECRET from ./.data
+├── start.sh             # Local startup helper that exports ENTRANCE_DATA_DIR and AUTH_SECRET from ./.data and accepts --port=4000
+├── start_nocors.sh      # Wrapper around start.sh that exports ENTRANCE_CORS_DISABLE=1 first
 ├── users.json           # User data (generated, may live under ENTRANCE_DATA_DIR)
 ├── .ssh_password_key    # SSH credential encryption key (generated)
 ├── LOGIN_KEEP           # Encrypted password-login timestamp for session keepalive

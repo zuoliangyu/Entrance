@@ -148,9 +148,13 @@ npm install
 
 # 使用 ./.data 里的持久化本地运行数据启动服务
 ./start.sh
+# 或在需要局域网 / 反向代理 / 内网穿透浏览器访问时放宽 CORS
+./start_nocors.sh
 ```
 
-`./start.sh` 是推荐的本地启动入口。首次运行且 `./.data` 还不存在时，它会创建 `./.data`、写入 `./.data/auth_secret`、导出 `ENTRANCE_DATA_DIR` 和 `AUTH_SECRET`，然后再执行 `npm start`。
+`./start.sh` 是推荐的本地启动入口。首次运行且 `./.data` 还不存在时，它会创建 `./.data`、写入 `./.data/auth_secret`、导出 `ENTRANCE_DATA_DIR` 和 `AUTH_SECRET`，然后再执行 `npm start`。它也支持 `--port=4000`，传入后会改为执行 `npm start -- --port 4000`。
+
+`./start_nocors.sh` 走的是同一套启动流程，只是在调用 `start.sh` 前额外导出 `ENTRANCE_CORS_DISABLE=1`。只有在你明确需要通过局域网 IP、反向代理或内网穿透域名从浏览器访问时才建议使用它。
 
 `npm start` 仍然会先从 `webui-src/` 重建模块化 WebUI，再启动服务，但前提是你已经提前导出了 `AUTH_SECRET`。如果只想刷新生成后的前端静态资源，可单独执行 `npm run build:webui`。
 
@@ -159,7 +163,9 @@ npm install
 如需指定端口，可使用环境变量或命令行参数：
 
 ```bash
-PORT=4000 ./start.sh
+./start.sh --port=4000
+# 或
+./start_nocors.sh --port=4000
 # 或者在已经导出 AUTH_SECRET 时
 PORT=4000 npm start
 # 或
@@ -181,7 +187,7 @@ export AUTH_SECRET="$(tr -d '\n' < ./.data/auth_secret)"
 npm start
 ```
 
-这与 `./start.sh` 的行为一致：如果 `./.data` 已经存在，脚本不会重新生成 `./.data/auth_secret`，所以重启前要确保这个文件仍然存在。运行时数据会固定在 `./.data`，Entrance 也会在 `./.data/.ssh_password_key` 中自动生成并复用 SSH 凭据加密密钥。不要在每次重启前重新生成 `SSH_PASSWORD_KEY`，否则历史白名单、密码和私钥将无法解密。
+这对应的是未传自定义端口时的 `./start.sh` 行为。如果执行 `./start.sh --port=4000`，最后一行则会变成 `npm start -- --port 4000`。如果 `./.data` 已经存在，脚本不会重新生成 `./.data/auth_secret`，所以重启前要确保这个文件仍然存在。运行时数据会固定在 `./.data`，Entrance 也会在 `./.data/.ssh_password_key` 中自动生成并复用 SSH 凭据加密密钥。不要在每次重启前重新生成 `SSH_PASSWORD_KEY`，否则历史白名单、密码和私钥将无法解密。
 
 默认账号为 `admin/admin`（首次启动自动生成）。
 
@@ -302,7 +308,8 @@ podman run -d --name entrance-tools \
 ├── vnc.js               # VNC 代理模块
 ├── nginx/               # 反向代理示例配置
 ├── package.json         # 依赖配置
-├── start.sh             # 本地启动辅助脚本，从 ./.data 导出 ENTRANCE_DATA_DIR 和 AUTH_SECRET
+├── start.sh             # 本地启动辅助脚本，从 ./.data 导出 ENTRANCE_DATA_DIR 和 AUTH_SECRET，并支持 --port=4000
+├── start_nocors.sh      # 在调用 start.sh 前额外导出 ENTRANCE_CORS_DISABLE=1 的包装脚本
 ├── users.json           # 用户数据（自动生成，可位于 ENTRANCE_DATA_DIR）
 ├── .ssh_password_key    # SSH 凭据加密密钥（自动生成）
 ├── LOGIN_KEEP           # 用于登录保持的密码登录时间戳（已加密）

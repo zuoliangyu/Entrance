@@ -20,6 +20,8 @@ npm install
 
 # Preferred local startup path
 ./start.sh
+# or with permissive CORS for LAN / reverse-proxy / tunnel browser access
+./start_nocors.sh
 
 # Rebuild generated frontend assets from webui-src/
 npm run build:webui
@@ -31,7 +33,9 @@ npm run dev
 # or
 node server.js
 # or on a custom port
-PORT=4000 ./start.sh
+./start.sh --port=4000
+# or with permissive CORS
+./start_nocors.sh --port=4000
 # or
 PORT=4000 npm start
 # or
@@ -59,6 +63,7 @@ PORT=4000 docker compose up -d --build
 - `STRICT_HOST_KEY_CHECKING` - When `true`, reject unknown SSH host keys instead of learning them.
 - `ALLOWED_TARGETS` - Comma-separated allowlist for SSH/VNC target hosts; supports exact names and `*.example.com` patterns.
 - `ALLOW_PRIVATE_NETWORKS` - When `true`, skip the admin-managed private CIDR whitelist check.
+- `ENTRANCE_CORS_DISABLE` - When set to `1`, widen CORS to allow non-localhost browser origins such as LAN IPs, reverse proxies, and tunnel domains. Prefer leaving it off unless that access pattern is intentional.
 - `ENTRANCE_DESKTOP_NOLOGIN` - When set to `1`, enable desktop no-login mode. Use it with the API-only bootstrap flow for secure Electron deployments.
 - `ENTRANCE_DESKTOP_API_ONLY` - When set to `1`, disable static WebUI serving and expose backend APIs only.
 - `ENTRANCE_DESKTOP_ALLOWED_ORIGIN` - Allowed renderer origin for desktop API-only CORS, defaults to `app://entrance`.
@@ -72,7 +77,8 @@ PORT=4000 docker compose up -d --build
 ├── .dockerignore       # Container build exclusions
 ├── compose.yml         # Docker Compose service definition
 ├── Dockerfile          # Container image build
-├── start.sh            # Preferred local launcher; exports ENTRANCE_DATA_DIR and AUTH_SECRET from ./.data
+├── start.sh            # Preferred local launcher; exports ENTRANCE_DATA_DIR and AUTH_SECRET from ./.data and accepts --port=4000
+├── start_nocors.sh     # Wrapper around start.sh that exports ENTRANCE_CORS_DISABLE=1 first
 ├── public/
 │   ├── assets/         # Generated frontend CSS/JS assets
 │   ├── index.html      # Generated frontend entrypoint
@@ -169,7 +175,7 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
 ### Adding Features
 1. Backend API: add routes in `server.js`
 2. Frontend features: change `webui-src/scripts/app.js`, `webui-src/styles/app.css`, or the relevant `webui-src/partials/*.html` file, then regenerate `public/` with `npm run build:webui`
-3. Testing: run `./start.sh` (or `npm start` with `AUTH_SECRET` already exported) and test locally
+3. Testing: run `./start.sh`, `./start_nocors.sh`, or `npm start` with `AUTH_SECRET` already exported, depending on the access pattern you need to verify
 
 ### Code Style
 - Use ES6+ syntax
@@ -187,12 +193,14 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
 ## Important Notes
 
 - Default account: `admin / admin` on first boot.
-- `./start.sh` is the preferred local entry point. It creates `./.data` and `./.data/auth_secret` only when `./.data` does not already exist, then exports `ENTRANCE_DATA_DIR` and `AUTH_SECRET` before calling `npm start`.
+- `./start.sh` is the preferred local entry point. It creates `./.data` and `./.data/auth_secret` only when `./.data` does not already exist, then exports `ENTRANCE_DATA_DIR` and `AUTH_SECRET` before calling `npm start`. Pass `--port=4000` to make it run `npm start -- --port 4000`.
+- `./start_nocors.sh` is the convenience wrapper for the same flow with `ENTRANCE_CORS_DISABLE=1`.
 - Password storage: Argon2id hashes in `users.json`; legacy plaintext entries are upgraded on successful login.
 - Password-login keepalive defaults to 7 days. The browser stores the chosen duration and only keeps restoring the saved session while token verification succeeds and the current `AUTH_SECRET` fingerprint still matches.
 - `LOGIN_KEEP` stores the last successful password-login Unix timestamp encrypted with AES-256-GCM using a key derived from `AUTH_SECRET`.
 - Stored SSH credentials and private-network allowlist entries are AES-256-GCM encrypted with `SSH_PASSWORD_KEY`.
 - If `SSH_PASSWORD_KEY` changes, existing encrypted secrets become unreadable until the old key is restored or the values are re-entered.
+- `ENTRANCE_CORS_DISABLE=1` widens browser access and is meant for explicit LAN, reverse-proxy, or tunnel use, not for the default tighter desktop/API-only deployment shape.
 - Desktop no-login should not expose `/api/auth/nologin` to browsers. Use `ENTRANCE_DESKTOP_API_ONLY=1`, loopback binding, and the `POST /api/auth/desktop/bootstrap` + `X-Entrance-Desktop-Secret` flow instead.
 - SFTP sessions are stored in memory (Map).
 - User data is isolated per user in separate JSON files under `ENTRANCE_DATA_DIR`.

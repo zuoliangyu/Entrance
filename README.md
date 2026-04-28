@@ -261,6 +261,8 @@ podman run -d --name entrance-tools \
 
 ## Environment Variables
 
+For behavior-focused notes, defaults, side effects, and deployment guidance, see [doc/environment-variables.md](doc/environment-variables.md).
+
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP listening port; can also be overridden with `npm start -- --port 4000` |
@@ -274,6 +276,7 @@ podman run -d --name entrance-tools \
 | `STRICT_HOST_KEY_CHECKING` | `false` | When `true`, reject unknown SSH host keys |
 | `ALLOWED_TARGETS` | empty | Comma-separated allowlist of target hosts, supports `*.example.com` |
 | `ALLOW_PRIVATE_NETWORKS` | `false` | When `true`, allow direct private-address access; otherwise admin allowlisting is required |
+| `ENTRANCE_CORS_DISABLE` | `0` | When `1`, allow any browser `Origin` to call the API instead of restricting CORS to localhost or the desktop renderer origin; useful for LAN IP, reverse-proxy, and tunnel access |
 | `ENTRANCE_DESKTOP_NOLOGIN` | `0` | When `1`, enable desktop no-login. For a secure Electron deployment, pair it with `ENTRANCE_DESKTOP_API_ONLY=1` and a bootstrap secret instead of exposing the web UI |
 | `ENTRANCE_DESKTOP_API_ONLY` | `0` | When `1`, disable static WebUI serving and expose backend APIs only; intended for Electron wrappers that render local frontend assets |
 | `ENTRANCE_DESKTOP_ALLOWED_ORIGIN` | `app://entrance` | Allowed renderer origin for CORS when `ENTRANCE_DESKTOP_API_ONLY=1` |
@@ -658,6 +661,7 @@ memory:[used:8192, free:4096, cached:2048]
 - The last successful password-login timestamp is stored in `ENTRANCE_DATA_DIR/LOGIN_KEEP` and encrypted with AES-256-GCM using a key derived from `AUTH_SECRET`.
 - SSH/SFTP credentials, including passwords, private keys, and passphrases, are stored only in the browser or in server-side user data; when persisted, they are encrypted with AES-256-GCM using `SSH_PASSWORD_KEY`.
 - The private network allowlist is stored in `private-networks.json` and encrypted with AES-256-GCM using `SSH_PASSWORD_KEY`.
+- `ENTRANCE_CORS_DISABLE=1` allows any browser origin to reach the API. Use it only when you intentionally need LAN, reverse-proxy, or tunnel access, and keep it off for tighter desktop/API-only deployments.
 - In desktop API-only mode the backend stops serving `public/index.html`, binds to loopback by default, and only exposes the admin no-login bootstrap through `POST /api/auth/desktop/bootstrap` with `X-Entrance-Desktop-Secret`.
 - If `SSH_PASSWORD_KEY` changes, historical encrypted credentials and allowlist entries become unreadable until the old key is restored or the data is re-entered.
 - **Local Shell Security** (Linux/macOS/Windows, admin only): local shell access gives direct terminal access to the server. Make sure to:

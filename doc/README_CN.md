@@ -260,6 +260,8 @@ podman run -d --name entrance-tools \
 
 ## 环境变量
 
+如果你想看“某个变量改了以后 Entrance 会变成什么行为”的说明、风险点和部署建议，可以直接查看 [environment-variables_CN.md](environment-variables_CN.md)。
+
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP 服务监听端口，也可通过 `npm start -- --port 4000` 覆盖 |
@@ -273,6 +275,7 @@ podman run -d --name entrance-tools \
 | `STRICT_HOST_KEY_CHECKING` | `false` | 设为 `true` 时拒绝未知 SSH 主机指纹 |
 | `ALLOWED_TARGETS` | 空 | 允许连接的目标主机白名单，逗号分隔，支持 `*.example.com` |
 | `ALLOW_PRIVATE_NETWORKS` | `false` | 设为 `true` 时允许直接访问私有地址；否则需通过管理员白名单放行 |
+| `ENTRANCE_CORS_DISABLE` | `0` | 设为 `1` 时允许任意浏览器 `Origin` 访问 API，不再只限制 `localhost` 或桌面渲染端 Origin；适合局域网 IP、反向代理和内网穿透访问 |
 | `ENTRANCE_DESKTOP_NOLOGIN` | `0` | 设为 `1` 时启用桌面免登录。若要在 Electron 中安全使用，建议配合 `ENTRANCE_DESKTOP_API_ONLY=1` 和引导密钥，而不是继续暴露网页 UI |
 | `ENTRANCE_DESKTOP_API_ONLY` | `0` | 设为 `1` 时关闭静态 WebUI，只暴露后端 API；用于由 Electron wrapper 本地渲染前端的场景 |
 | `ENTRANCE_DESKTOP_ALLOWED_ORIGIN` | `app://entrance` | `ENTRANCE_DESKTOP_API_ONLY=1` 时允许访问 API 的渲染端 Origin |
@@ -657,6 +660,7 @@ memory:[used:8192, free:4096, cached:2048]
 - 最近一次密码登录的 Unix 时间戳保存在 `ENTRANCE_DATA_DIR/LOGIN_KEEP` 中，并使用基于 `AUTH_SECRET` 派生密钥的 AES-256-GCM 加密。
 - SSH/SFTP 凭据（密码、私钥、私钥口令）仅保存在用户浏览器本地或服务端用户数据中，服务端落盘会使用 `SSH_PASSWORD_KEY` 进行 AES-256-GCM 加密。
 - 私有网络白名单存储在 `private-networks.json` 中，服务端落盘同样使用 `SSH_PASSWORD_KEY` 进行 AES-256-GCM 加密。
+- `ENTRANCE_CORS_DISABLE=1` 会允许任意浏览器来源访问 API。只有在你明确需要局域网、反向代理或内网穿透访问时才建议开启；桌面/API-only 的高安全部署默认应保持关闭。
 - 在桌面 API-only 模式下，后端默认只绑定到 loopback，不再提供 `public/index.html`，并且只有携带 `X-Entrance-Desktop-Secret` 的 `POST /api/auth/desktop/bootstrap` 才能拿到 admin 免登录 token。
 - `SSH_PASSWORD_KEY` 变更后，历史已加密凭据和白名单将无法解密；需要恢复原密钥或重新录入数据。
 - **本地 Shell 安全提示**（Linux/macOS/Windows，仅管理员可用）：本地 Shell 功能允许直接访问服务器终端，请确保：

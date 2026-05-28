@@ -103,6 +103,14 @@
 - 删除文件/文件夹
 - Ctrl+点击 多选文件
 
+### 插件系统
+- 侧边栏在设置上方提供 **插件安装** 和 **插件导航**
+- 管理员可在 Fluent Design 卡片界面上传 ZIP 插件包并删除已安装插件
+- 插件卡片显示插件名称、版本、作者、描述、入口文件和项目主页
+- 插件导航会在工作台内打开已安装插件，体验类似串口终端等内置页面
+- 已安装插件保存到 `ENTRANCE_DATA_DIR` 下的 `.plugins/`（默认是仓库根目录 `.plugins/`）
+- 仓库根目录 `api/` 提供插件包契约示例：`version.json`、`index.js` 和 `index.html`
+
 ### 界面特性
 - Microsoft Fluent Design 设计风格
 - 亮色/暗色主题切换
@@ -163,6 +171,12 @@ npm install
 `npm start` 仍然会先从 `webui-src/` 重建模块化 WebUI，再启动服务，但前提是你已经提前导出了 `AUTH_SECRET`。如果只想刷新生成后的前端静态资源，可单独执行 `npm run build:webui`。
 
 访问 http://localhost:3000，使用账号登录后进入工具面板。
+
+修改插件安装、插件导航或插件包约定时，可运行插件冒烟测试：
+
+```bash
+npm run test:plugins
+```
 
 如需指定端口，可使用环境变量或命令行参数：
 
@@ -276,7 +290,7 @@ podman run -d --name entrance-tools \
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP 服务监听端口，也可通过 `npm start -- --port 4000` 覆盖 |
 | `ENTRANCE_HOST` | Web 模式为 `0.0.0.0`，桌面 API-only 模式为 `127.0.0.1` | 显式指定监听地址 |
-| `ENTRANCE_DATA_DIR` | 项目根目录 | 持久化数据目录，包含 `users.json`、`userdata/`、`known_hosts.json`、`private-networks.json`、`.ssh_password_key`、`LOGIN_KEEP` |
+| `ENTRANCE_DATA_DIR` | 项目根目录 | 持久化数据目录，包含 `users.json`、`userdata/`、`known_hosts.json`、`private-networks.json`、`.ssh_password_key`、`LOGIN_KEEP`、`.plugins/` |
 | `AUTH_SECRET` | 无，必填 | 登录 token 签名密钥，要求至少 32 字节（base64 或 64 字符十六进制） |
 | `SSH_PASSWORD_KEY` | 未设置时自动生成 `.ssh_password_key` | 用于加密 SSH/SFTP 凭据与私有网络白名单的 32 字节密钥；如果手动设置，必须在重启后保持不变 |
 | `AUTH_TOKEN_TTL` | `604800` | 密码登录默认 token 有效期（秒）；可被设置页中的登录保持时间覆盖 |
@@ -301,6 +315,7 @@ podman run -d --name entrance-tools \
 │   ├── assets/          # 由 webui-src/ 生成的 CSS/JS 产物
 │   ├── index.html       # 生成后的前端入口
 │   └── vnc-client.js
+├── api/                 # 插件包契约示例
 ├── webui-src/           # 可编辑的 WebUI 源文件与 HTML 分块
 │   ├── index.template.html
 │   ├── partials/
@@ -316,6 +331,7 @@ podman run -d --name entrance-tools \
 ├── start_nocors.sh      # 在调用 start.sh 前额外导出 ENTRANCE_CORS_DISABLE=1 的包装脚本
 ├── users.json           # 用户数据（自动生成，可位于 ENTRANCE_DATA_DIR）
 ├── .ssh_password_key    # SSH 凭据加密密钥（自动生成）
+├── .plugins/            # 已安装插件（在 ENTRANCE_DATA_DIR 下自动生成）
 ├── LOGIN_KEEP           # 用于登录保持的密码登录时间戳（已加密）
 ├── known_hosts.json     # SSH 主机指纹（自动生成）
 ├── private-networks.json  # 私有网络白名单（自动生成，已加密）
@@ -350,6 +366,7 @@ WebUI 源码按职责拆分：
 - [argon2](https://github.com/ranisalt/node-argon2) - 用户密码 Argon2id 哈希
 - [multer](https://github.com/expressjs/multer) - 文件上传
 - [archiver](https://github.com/archiverjs/node-archiver) - ZIP 打包
+- [adm-zip](https://github.com/cthackers/adm-zip) - 插件 ZIP 解包
 
 > **注意**：本地 Shell 功能支持 Linux、macOS 与 Windows。Linux/macOS 使用 `script` 创建 PTY；Windows 不再直接 `spawn` `COMSPEC`/PowerShell，而是通过本机 `OpenSSH Server` 连接 `127.0.0.1` 来获得正确的终端编辑行为。
 
@@ -400,6 +417,15 @@ SFTP 连接参数示例：
   "passphrase": "optional"
 }
 ```
+
+### 插件
+- `GET /api/plugins` - 列出已安装插件
+- `POST /api/plugins/install` - 安装插件 ZIP 包（管理员）
+- `DELETE /api/plugins/:id` - 删除已安装插件（管理员）
+- `GET /api/plugins/:id/page` - 打开插件运行页面
+- `GET /api/plugins/:id/assets/*` - 提供插件根目录内的文件
+
+插件包格式、`api/version.json` 约束和 `index.js` 运行时接口见 [插件 API](../api/plugins.md)。
 
 ### 安全配置
 - `GET /api/security/private-networks` - 获取私有网段白名单（管理员）

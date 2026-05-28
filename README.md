@@ -104,6 +104,14 @@ For the installer script, see [Install](https://github.com/EntranceToolBox/Entra
 - Delete files and folders
 - Ctrl+click multi-select
 
+### Plugin System
+- Sidebar entries for **Plugin Install** and **Plugin Navigator** above Settings
+- Administrators can install ZIP plugin packages and delete installed plugins from the Fluent Design card UI
+- Plugin cards show plugin name, version, author, description, entry file, and project homepage
+- Plugin Navigator opens an installed plugin inside the workspace, similar to built-in pages such as Serial Terminal
+- Installed plugins are stored under `.plugins/` in `ENTRANCE_DATA_DIR` (repo-root `.plugins/` by default)
+- The root `api/` directory contains the plugin package contract examples: `version.json`, `index.js`, and `index.html`
+
 ### UI Features
 - Microsoft Fluent Design
 - Light / dark theme toggle
@@ -164,6 +172,12 @@ npm install
 `npm start` still rebuilds the modular WebUI from `webui-src/` before launching the server, but it requires `AUTH_SECRET` to already be exported. Use `npm run build:webui` if you only want to refresh the generated frontend assets.
 
 Visit http://localhost:3000 and sign in to enter the dashboard.
+
+Run the plugin smoke test when touching plugin install, navigation, or package contract behavior:
+
+```bash
+npm run test:plugins
+```
 
 To use a different port, use an environment variable or CLI flag:
 
@@ -277,7 +291,7 @@ For behavior-focused notes, defaults, side effects, and deployment guidance, see
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP listening port; can also be overridden with `npm start -- --port 4000` |
 | `ENTRANCE_HOST` | `0.0.0.0` in web mode, `127.0.0.1` in desktop API-only mode | Explicit bind host override |
-| `ENTRANCE_DATA_DIR` | repository root | Persistent data directory containing `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, `.ssh_password_key`, and `LOGIN_KEEP` |
+| `ENTRANCE_DATA_DIR` | repository root | Persistent data directory containing `users.json`, `userdata/`, `known_hosts.json`, `private-networks.json`, `.ssh_password_key`, `LOGIN_KEEP`, and `.plugins/` |
 | `AUTH_SECRET` | none, required | Signing key for auth tokens; must be at least 32 bytes (base64 or 64 hex chars) |
 | `SSH_PASSWORD_KEY` | auto-generates `.ssh_password_key` when unset | 32-byte key used to encrypt SSH/SFTP credentials and the private network allowlist; if set manually, it must remain stable across restarts |
 | `AUTH_TOKEN_TTL` | `604800` | Default auth token lifetime in seconds for password logins unless overridden by the Settings keepalive value |
@@ -302,6 +316,7 @@ For behavior-focused notes, defaults, side effects, and deployment guidance, see
 │   ├── assets/          # Generated CSS/JS bundles built from webui-src/
 │   ├── index.html       # Generated frontend entrypoint
 │   └── vnc-client.js
+├── api/                 # Plugin package contract examples
 ├── webui-src/           # Editable WebUI source files and HTML partials
 │   ├── index.template.html
 │   ├── partials/
@@ -317,6 +332,7 @@ For behavior-focused notes, defaults, side effects, and deployment guidance, see
 ├── start_nocors.sh      # Wrapper around start.sh that exports ENTRANCE_CORS_DISABLE=1 first
 ├── users.json           # User data (generated, may live under ENTRANCE_DATA_DIR)
 ├── .ssh_password_key    # SSH credential encryption key (generated)
+├── .plugins/            # Installed plugins (generated under ENTRANCE_DATA_DIR)
 ├── LOGIN_KEEP           # Encrypted password-login timestamp for session keepalive
 ├── known_hosts.json     # SSH host fingerprints (generated)
 ├── private-networks.json  # Private network allowlist (generated, encrypted)
@@ -351,6 +367,7 @@ WebUI source is split by responsibility:
 - [argon2](https://github.com/ranisalt/node-argon2) - Argon2id password hashing
 - [multer](https://github.com/expressjs/multer) - file uploads
 - [archiver](https://github.com/archiverjs/node-archiver) - ZIP packaging
+- [adm-zip](https://github.com/cthackers/adm-zip) - plugin ZIP extraction
 
 > **Note**: Local Shell supports Linux, macOS, and Windows. Linux/macOS uses `script` to create PTYs. Windows no longer spawns `COMSPEC`/PowerShell directly; instead it connects to local `OpenSSH Server` on `127.0.0.1` to get correct terminal editing semantics.
 
@@ -401,6 +418,15 @@ Example SFTP connection payloads:
   "passphrase": "optional"
 }
 ```
+
+### Plugins
+- `GET /api/plugins` - list installed plugins
+- `POST /api/plugins/install` - install a plugin ZIP package (admin)
+- `DELETE /api/plugins/:id` - delete an installed plugin (admin)
+- `GET /api/plugins/:id/page` - open the plugin runtime page
+- `GET /api/plugins/:id/assets/*` - serve files from the plugin root directory
+
+For the plugin package format, `api/version.json` constraints, and `index.js` runtime contract, see [Plugin API](api/plugins.md).
 
 ### Security Configuration
 - `GET /api/security/private-networks` - get the private CIDR allowlist (admin)

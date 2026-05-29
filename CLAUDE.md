@@ -8,6 +8,8 @@ Entrance Tools is a web-based server management tool that supports SSH terminals
 
 Documentation is English-first: keep the root `README.md` as the default English README, keep the Simplified Chinese translation in `doc/README_CN.md`, use `doc/screenshot.png` from the root README, and use `screenshot_cn.png` inside `doc/README_CN.md`. Keep `AGENTS.md` and `CLAUDE.md` in English when updating repository guidance. Preserve each document's existing language when editing it; do not mix languages inside a file unless that file already does so intentionally. When modifying a Markdown document, keep the document in its existing language. When `README.md` changes, update every corresponding `README_XX.md` translation document in the repository in the same pass; in this repository that means `doc/README_CN.md` must stay aligned with `README.md`.
 
+The root README is intentionally an overview with links. Do not add long-form Technology Stack, API, Security Notes, Environment Variables, or container deployment content back into `README.md`; keep README to its current major sections and link out to dedicated docs. Before changing those topics, read and update the relevant documentation pair: `doc/TechnologyStack.md` + `doc/TechnologyStack_CN.md`, `doc/api.md` + `doc/api_CN.md`, `doc/security_note.md` + `doc/security_note_CN.md`, `doc/environment-variables.md` + `doc/environment-variables_CN.md`, and `doc/container.md` + `doc/container_CN.md`. If a new long README topic is needed later, create or update a dedicated `doc/*.md` page plus its Chinese translation, then add only a short README link.
+
 ## Collaboration Preference
 
 When the user provides a numbered list of requirements such as `1.` and `2.`, first reply with the implementation plan and wait for approval before making changes.
@@ -54,6 +56,8 @@ PORT=4000 docker compose up -d --build
 # Podman users can substitute docker with podman
 ```
 
+Keep detailed container instructions in `doc/container.md` and `doc/container_CN.md`; README files should only link to those pages.
+
 ## Environment Variables
 
 - `AUTH_SECRET` (required) - Auth token signing key; must decode to at least 32 bytes. `./start.sh` bootstraps it from `./.data/auth_secret` for the default local workflow.
@@ -71,6 +75,8 @@ PORT=4000 docker compose up -d --build
 - `ENTRANCE_DESKTOP_API_ONLY` - When set to `1`, disable static WebUI serving and expose backend APIs only.
 - `ENTRANCE_DESKTOP_ALLOWED_ORIGIN` - Allowed renderer origin for desktop API-only CORS, defaults to `app://entrance`.
 - `ENTRANCE_DESKTOP_BOOTSTRAP_SECRET` - Required when both `ENTRANCE_DESKTOP_API_ONLY=1` and `ENTRANCE_DESKTOP_NOLOGIN=1`; used by the desktop wrapper to obtain the admin no-login token securely.
+
+Keep detailed environment-variable behavior in `doc/environment-variables.md` and `doc/environment-variables_CN.md`; README files should only link to those pages.
 
 ## Architecture Overview
 
@@ -191,6 +197,7 @@ All three panels follow the same pattern: `collectXxx()` server function → `se
 2. Frontend features: change `webui-src/scripts/app.js`, `webui-src/styles/app.css`, or the relevant `webui-src/partials/*.html` file, then regenerate `public/` with `npm run build:webui`
 3. Testing: run `npm run test:plugins` for plugin changes, then run `./start.sh`, `./start_nocors.sh`, or `npm start` with `AUTH_SECRET` already exported, depending on the access pattern you need to verify
 4. Plugin changes: keep `server.js`, the frontend `Plugins` object/partials, generated `public/` assets, root `api/` examples, `api/plugins.md`, `api/hello-plugins/`, `README.md`, and `doc/README_CN.md` aligned
+5. Documentation changes: keep long-form reference content out of `README.md`; update the relevant `doc/*.md` page and its `_CN.md` translation, then keep README / `doc/README_CN.md` as link-only entry points for that topic
 
 ### Code Style
 - Use ES6+ syntax
